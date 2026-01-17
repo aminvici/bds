@@ -19,16 +19,22 @@ type OffsetManager interface {
 	// will otherwise leak memory. You must call this after all the
 	// PartitionOffsetManagers are closed.
 	Close() error
+
+	// Commit commits the offsets. This method can be used if AutoCommit.Enable is
+	// set to false.
+	Commit()
 }
 
 type offsetManager struct {
-	client Client
-	conf   *Config
-	group  string
-	ticker *time.Ticker
+	client          Client
+	conf            *Config
+	group           string
+	ticker          *time.Ticker
+	sessionCanceler func()
 
-	memberID   string
-	generation int32
+	memberID        string
+	groupInstanceId *string
+	generation      int32
 
 	broker     *Broker
 	brokerLock sync.RWMutex
@@ -44,10 +50,10 @@ type offsetManager struct {
 // NewOffsetManagerFromClient creates a new OffsetManager from the given client.
 // It is still necessary to call Close() on the underlying client when finished with the partition manager.
 func NewOffsetManagerFromClient(group string, client Client) (OffsetManager, error) {
-	return newOffsetManagerFromClient(group, "", GroupGenerationUndefined, client)
+	return newOffsetManagerFromClient(group, "", GroupGenerationUndefined, client, nil)
 }
 
-func newOffsetManagerFromClient(group, memberID string, generation int32, client Client) (*offsetManager, error) {
+func newOffsetManagerFromClient(group, memberID string, generation int32, client Client, sessionCanceler func()) (*offsetManager, error) {
 	// Check that we are not dealing with a closed Client before processing any other arguments
 	if client.Closed() {
 		return nil, ErrClosedClient
@@ -55,11 +61,11 @@ func newOffsetManagerFromClient(group, memberID string, generation int32, client
 
 	conf := client.Config()
 	om := &offsetManager{
-		client: client,
-		conf:   conf,
-		group:  group,
-		ticker: time.NewTicker(conf.Consumer.Offsets.CommitInterval),
-		poms:   make(map[string]map[int32]*partitionOffsetManager),
+		client:          client,
+		conf:            conf,
+		group:           group,
+		poms:            make(map[string]map[int32]*partitionOffsetManager),
+		sessionCanceler: sessionCanceler,
 
 		memberID:   memberID,
 		generation: generation,
@@ -67,7 +73,13 @@ func newOffsetManagerFromClient(group, memberID string, generation int32, client
 		closing: make(chan none),
 		closed:  make(chan none),
 	}
-	go withRecover(om.mainLoop)
+	if conf.Consumer.Group.InstanceId != "" {
+		om.groupInstanceId = &conf.Consumer.Group.InstanceId
+	}
+	if conf.Consumer.Offsets.AutoCommit.Enable {
+		om.ticker = time.NewTicker(conf.Consumer.Offsets.AutoCommit.Interval)
+		go withRecover(om.mainLoop)
+	}
 
 	return om, nil
 }
@@ -99,16 +111,20 @@ func (om *offsetManager) Close() error {
 	om.closeOnce.Do(func() {
 		// exit the mainLoop
 		close(om.closing)
-		<-om.closed
+		if om.conf.Consumer.Offsets.AutoCommit.Enable {
+			<-om.closed
+		}
 
 		// mark all POMs as closed
 		om.asyncClosePOMs()
 
 		// flush one last time
-		for attempt := 0; attempt <= om.conf.Consumer.Offsets.Retry.Max; attempt++ {
-			om.flushToBroker()
-			if om.releasePOMs(false) == 0 {
-				break
+		if om.conf.Consumer.Offsets.AutoCommit.Enable {
+			for attempt := 0; attempt <= om.conf.Consumer.Offsets.Retry.Max; attempt++ {
+				om.flushToBroker()
+				if om.releasePOMs(false) == 0 {
+					break
+				}
 			}
 		}
 
@@ -128,24 +144,21 @@ func (om *offsetManager) computeBackoff(retries int) time.Duration {
 	}
 }
 
-func (om *offsetManager) fetchInitialOffset(topic string, partition int32, retries int) (int64, string, error) {
+func (om *offsetManager) fetchInitialOffset(topic string, partition int32, retries int) (int64, int32, string, error) {
 	broker, err := om.coordinator()
 	if err != nil {
 		if retries <= 0 {
-			return 0, "", err
+			return 0, 0, "", err
 		}
 		return om.fetchInitialOffset(topic, partition, retries-1)
 	}
 
-	req := new(OffsetFetchRequest)
-	req.Version = 1
-	req.ConsumerGroup = om.group
-	req.AddPartition(topic, partition)
-
+	partitions := map[string][]int32{topic: {partition}}
+	req := NewOffsetFetchRequest(om.conf.Version, om.group, partitions)
 	resp, err := broker.FetchOffset(req)
 	if err != nil {
 		if retries <= 0 {
-			return 0, "", err
+			return 0, 0, "", err
 		}
 		om.releaseCoordinator(broker)
 		return om.fetchInitialOffset(topic, partition, retries-1)
@@ -153,31 +166,31 @@ func (om *offsetManager) fetchInitialOffset(topic string, partition int32, retri
 
 	block := resp.GetBlock(topic, partition)
 	if block == nil {
-		return 0, "", ErrIncompleteResponse
+		return 0, 0, "", ErrIncompleteResponse
 	}
 
 	switch block.Err {
 	case ErrNoError:
-		return block.Offset, block.Metadata, nil
+		return block.Offset, block.LeaderEpoch, block.Metadata, nil
 	case ErrNotCoordinatorForConsumer:
 		if retries <= 0 {
-			return 0, "", block.Err
+			return 0, 0, "", block.Err
 		}
 		om.releaseCoordinator(broker)
 		return om.fetchInitialOffset(topic, partition, retries-1)
 	case ErrOffsetsLoadInProgress:
 		if retries <= 0 {
-			return 0, "", block.Err
+			return 0, 0, "", block.Err
 		}
 		backoff := om.computeBackoff(retries)
 		select {
 		case <-om.closing:
-			return 0, "", block.Err
+			return 0, 0, "", block.Err
 		case <-time.After(backoff):
 		}
 		return om.fetchInitialOffset(topic, partition, retries-1)
 	default:
-		return 0, "", block.Err
+		return 0, 0, "", block.Err
 	}
 }
 
@@ -225,27 +238,36 @@ func (om *offsetManager) mainLoop() {
 	for {
 		select {
 		case <-om.ticker.C:
-			om.flushToBroker()
-			om.releasePOMs(false)
+			om.Commit()
 		case <-om.closing:
 			return
 		}
 	}
 }
 
-func (om *offsetManager) flushToBroker() {
-	req := om.constructRequest()
-	if req == nil {
-		return
-	}
+func (om *offsetManager) Commit() {
+	om.flushToBroker()
+	om.releasePOMs(false)
+}
 
+func (om *offsetManager) flushToBroker() {
 	broker, err := om.coordinator()
 	if err != nil {
 		om.handleError(err)
 		return
 	}
 
-	resp, err := broker.CommitOffset(req)
+	// Care needs to be taken to unlock this. Don't want to defer the unlock as this would
+	// cause the lock to be held while waiting for the broker to reply.
+	broker.lock.Lock()
+	req := om.constructRequest()
+	if req == nil {
+		broker.lock.Unlock()
+		return
+	}
+	resp, rp, err := sendOffsetCommit(broker, req)
+	broker.lock.Unlock()
+
 	if err != nil {
 		om.handleError(err)
 		om.releaseCoordinator(broker)
@@ -253,29 +275,78 @@ func (om *offsetManager) flushToBroker() {
 		return
 	}
 
+	err = handleResponsePromise(req, resp, rp, nil)
+	if err != nil {
+		om.handleError(err)
+		om.releaseCoordinator(broker)
+		_ = broker.Close()
+		return
+	}
+
+	broker.handleThrottledResponse(resp)
 	om.handleResponse(broker, req, resp)
 }
 
-func (om *offsetManager) constructRequest() *OffsetCommitRequest {
-	var r *OffsetCommitRequest
-	var perPartitionTimestamp int64
-	if om.conf.Consumer.Offsets.Retention == 0 {
-		perPartitionTimestamp = ReceiveTime
-		r = &OffsetCommitRequest{
-			Version:                 1,
-			ConsumerGroup:           om.group,
-			ConsumerID:              om.memberID,
-			ConsumerGroupGeneration: om.generation,
-		}
-	} else {
-		r = &OffsetCommitRequest{
-			Version:                 2,
-			RetentionTime:           int64(om.conf.Consumer.Offsets.Retention / time.Millisecond),
-			ConsumerGroup:           om.group,
-			ConsumerID:              om.memberID,
-			ConsumerGroupGeneration: om.generation,
-		}
+func sendOffsetCommit(coordinator *Broker, req *OffsetCommitRequest) (*OffsetCommitResponse, *responsePromise, error) {
+	resp := new(OffsetCommitResponse)
 
+	promise, err := coordinator.send(req, resp)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return resp, promise, nil
+}
+
+func (om *offsetManager) constructRequest() *OffsetCommitRequest {
+	r := &OffsetCommitRequest{
+		Version:                 1,
+		ConsumerGroup:           om.group,
+		ConsumerID:              om.memberID,
+		ConsumerGroupGeneration: om.generation,
+	}
+	// Version 1 adds timestamp and group membership information, as well as the commit timestamp.
+	//
+	// Version 2 adds retention time.  It removes the commit timestamp added in version 1.
+	if om.conf.Version.IsAtLeast(V0_9_0_0) {
+		r.Version = 2
+	}
+	// Version 3 and 4 are the same as version 2.
+	if om.conf.Version.IsAtLeast(V0_11_0_0) {
+		r.Version = 3
+	}
+	if om.conf.Version.IsAtLeast(V2_0_0_0) {
+		r.Version = 4
+	}
+	// Version 5 removes the retention time, which is now controlled only by a broker configuration.
+	//
+	// Version 6 adds the leader epoch for fencing.
+	if om.conf.Version.IsAtLeast(V2_1_0_0) {
+		r.Version = 6
+	}
+	// version 7 adds a new field called groupInstanceId to indicate member identity across restarts.
+	if om.conf.Version.IsAtLeast(V2_3_0_0) {
+		r.Version = 7
+		r.GroupInstanceId = om.groupInstanceId
+	}
+
+	// commit timestamp was only briefly supported in V1 where we set it to
+	// ReceiveTime (-1) to tell the broker to set it to the time when the commit
+	// request was received
+	var commitTimestamp int64
+	if r.Version == 1 {
+		commitTimestamp = ReceiveTime
+	}
+
+	// request controlled retention was only supported from V2-V4 (it became
+	// broker-only after that) so if the user has set the config options then
+	// flow those through as retention time on the commit request.
+	if r.Version >= 2 && r.Version < 5 {
+		// Map Sarama's default of 0 to Kafka's default of -1
+		r.RetentionTime = -1
+		if om.conf.Consumer.Offsets.Retention > 0 {
+			r.RetentionTime = int64(om.conf.Consumer.Offsets.Retention / time.Millisecond)
+		}
 	}
 
 	om.pomsLock.RLock()
@@ -285,7 +356,7 @@ func (om *offsetManager) constructRequest() *OffsetCommitRequest {
 		for _, pom := range topicManagers {
 			pom.lock.Lock()
 			if pom.dirty {
-				r.AddBlock(pom.topic, pom.partition, pom.offset, perPartitionTimestamp, pom.metadata)
+				r.AddBlockWithLeaderEpoch(pom.topic, pom.partition, pom.offset, pom.leaderEpoch, commitTimestamp, pom.metadata)
 			}
 			pom.lock.Unlock()
 		}
@@ -333,11 +404,15 @@ func (om *offsetManager) handleResponse(broker *Broker, req *OffsetCommitRequest
 				pom.handleError(err)
 			case ErrOffsetsLoadInProgress:
 				// nothing wrong but we didn't commit, we'll get it next time round
+			case ErrFencedInstancedId:
+				pom.handleError(err)
+				// TODO close the whole consumer for instance fenced....
+				om.tryCancelSession()
 			case ErrUnknownTopicOrPartition:
 				// let the user know *and* try redispatching - if topic-auto-create is
 				// enabled, redispatching should trigger a metadata req and create the
 				// topic; if not then re-dispatching won't help, but we've let the user
-				// know and it shouldn't hurt either (see https://github.com/Shopify/sarama/issues/706)
+				// know and it shouldn't hurt either (see https://github.com/IBM/sarama/issues/706)
 				fallthrough
 			default:
 				// dunno, tell the user and try redispatching
@@ -407,6 +482,12 @@ func (om *offsetManager) findPOM(topic string, partition int32) *partitionOffset
 	return nil
 }
 
+func (om *offsetManager) tryCancelSession() {
+	if om.sessionCanceler != nil {
+		om.sessionCanceler()
+	}
+}
+
 // Partition Offset Manager
 
 // PartitionOffsetManager uses Kafka to store and fetch consumed partition offsets. You MUST call Close()
@@ -463,9 +544,10 @@ type PartitionOffsetManager interface {
 }
 
 type partitionOffsetManager struct {
-	parent    *offsetManager
-	topic     string
-	partition int32
+	parent      *offsetManager
+	topic       string
+	partition   int32
+	leaderEpoch int32
 
 	lock     sync.Mutex
 	offset   int64
@@ -478,18 +560,19 @@ type partitionOffsetManager struct {
 }
 
 func (om *offsetManager) newPartitionOffsetManager(topic string, partition int32) (*partitionOffsetManager, error) {
-	offset, metadata, err := om.fetchInitialOffset(topic, partition, om.conf.Metadata.Retry.Max)
+	offset, leaderEpoch, metadata, err := om.fetchInitialOffset(topic, partition, om.conf.Metadata.Retry.Max)
 	if err != nil {
 		return nil, err
 	}
 
 	return &partitionOffsetManager{
-		parent:    om,
-		topic:     topic,
-		partition: partition,
-		errors:    make(chan *ConsumerError, om.conf.ChannelBufferSize),
-		offset:    offset,
-		metadata:  metadata,
+		parent:      om,
+		topic:       topic,
+		partition:   partition,
+		leaderEpoch: leaderEpoch,
+		errors:      make(chan *ConsumerError, om.conf.ChannelBufferSize),
+		offset:      offset,
+		metadata:    metadata,
 	}, nil
 }
 

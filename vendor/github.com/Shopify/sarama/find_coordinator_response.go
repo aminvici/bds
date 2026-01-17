@@ -14,6 +14,10 @@ type FindCoordinatorResponse struct {
 	Coordinator  *Broker
 }
 
+func (f *FindCoordinatorResponse) setVersion(v int16) {
+	f.Version = v
+}
+
 func (f *FindCoordinatorResponse) decode(pd packetDecoder, version int16) (err error) {
 	if version >= 1 {
 		f.Version = version
@@ -75,18 +79,32 @@ func (f *FindCoordinatorResponse) encode(pe packetEncoder) error {
 }
 
 func (f *FindCoordinatorResponse) key() int16 {
-	return 10
+	return apiKeyFindCoordinator
 }
 
 func (f *FindCoordinatorResponse) version() int16 {
 	return f.Version
 }
 
+func (r *FindCoordinatorResponse) headerVersion() int16 {
+	return 0
+}
+
+func (f *FindCoordinatorResponse) isValidVersion() bool {
+	return f.Version >= 0 && f.Version <= 2
+}
+
 func (f *FindCoordinatorResponse) requiredVersion() KafkaVersion {
 	switch f.Version {
+	case 2:
+		return V2_0_0_0
 	case 1:
 		return V0_11_0_0
 	default:
 		return V0_8_2_0
 	}
+}
+
+func (r *FindCoordinatorResponse) throttleTime() time.Duration {
+	return r.ThrottleTime
 }

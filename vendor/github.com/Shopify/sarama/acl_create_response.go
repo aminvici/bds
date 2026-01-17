@@ -2,10 +2,15 @@ package sarama
 
 import "time"
 
-//CreateAclsResponse is a an acl reponse creation type
+// CreateAclsResponse is a an acl response creation type
 type CreateAclsResponse struct {
+	Version              int16
 	ThrottleTime         time.Duration
 	AclCreationResponses []*AclCreationResponse
+}
+
+func (c *CreateAclsResponse) setVersion(v int16) {
+	c.Version = v
 }
 
 func (c *CreateAclsResponse) encode(pe packetEncoder) error {
@@ -48,18 +53,35 @@ func (c *CreateAclsResponse) decode(pd packetDecoder, version int16) (err error)
 }
 
 func (c *CreateAclsResponse) key() int16 {
-	return 30
+	return apiKeyCreateAcls
 }
 
 func (c *CreateAclsResponse) version() int16 {
+	return c.Version
+}
+
+func (c *CreateAclsResponse) headerVersion() int16 {
 	return 0
 }
 
-func (c *CreateAclsResponse) requiredVersion() KafkaVersion {
-	return V0_11_0_0
+func (c *CreateAclsResponse) isValidVersion() bool {
+	return c.Version >= 0 && c.Version <= 1
 }
 
-//AclCreationResponse is an acl creation response type
+func (c *CreateAclsResponse) requiredVersion() KafkaVersion {
+	switch c.Version {
+	case 1:
+		return V2_0_0_0
+	default:
+		return V0_11_0_0
+	}
+}
+
+func (r *CreateAclsResponse) throttleTime() time.Duration {
+	return r.ThrottleTime
+}
+
+// AclCreationResponse is an acl creation response type
 type AclCreationResponse struct {
 	Err    KError
 	ErrMsg *string

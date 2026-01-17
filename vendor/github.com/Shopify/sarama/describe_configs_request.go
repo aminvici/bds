@@ -6,6 +6,10 @@ type DescribeConfigsRequest struct {
 	IncludeSynonyms bool
 }
 
+func (r *DescribeConfigsRequest) setVersion(v int16) {
+	r.Version = v
+}
+
 type ConfigResource struct {
 	Type        ConfigResourceType
 	Name        string
@@ -61,7 +65,6 @@ func (r *DescribeConfigsRequest) decode(pd packetDecoder, version int16) (err er
 		r.Resources[i].Name = name
 
 		confLength, err := pd.getArrayLength()
-
 		if err != nil {
 			return err
 		}
@@ -93,20 +96,30 @@ func (r *DescribeConfigsRequest) decode(pd packetDecoder, version int16) (err er
 }
 
 func (r *DescribeConfigsRequest) key() int16 {
-	return 32
+	return apiKeyDescribeConfigs
 }
 
 func (r *DescribeConfigsRequest) version() int16 {
 	return r.Version
 }
 
+func (r *DescribeConfigsRequest) headerVersion() int16 {
+	return 1
+}
+
+func (r *DescribeConfigsRequest) isValidVersion() bool {
+	return r.Version >= 0 && r.Version <= 2
+}
+
 func (r *DescribeConfigsRequest) requiredVersion() KafkaVersion {
 	switch r.Version {
-	case 1:
-		return V1_1_0_0
 	case 2:
 		return V2_0_0_0
-	default:
+	case 1:
+		return V1_1_0_0
+	case 0:
 		return V0_11_0_0
+	default:
+		return V2_0_0_0
 	}
 }

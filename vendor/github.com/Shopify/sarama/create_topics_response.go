@@ -6,9 +6,17 @@ import (
 )
 
 type CreateTopicsResponse struct {
-	Version      int16
+	// Version defines the protocol version to use for encode and decode
+	Version int16
+	// ThrottleTime contains the duration for which the request was throttled due
+	// to a quota violation, or zero if the request did not violate any quota.
 	ThrottleTime time.Duration
-	TopicErrors  map[string]*TopicError
+	// TopicErrors contains a map of any errors for the topics we tried to create.
+	TopicErrors map[string]*TopicError
+}
+
+func (c *CreateTopicsResponse) setVersion(v int16) {
+	c.Version = v
 }
 
 func (c *CreateTopicsResponse) encode(pe packetEncoder) error {
@@ -63,22 +71,38 @@ func (c *CreateTopicsResponse) decode(pd packetDecoder, version int16) (err erro
 }
 
 func (c *CreateTopicsResponse) key() int16 {
-	return 19
+	return apiKeyCreateTopics
 }
 
 func (c *CreateTopicsResponse) version() int16 {
 	return c.Version
 }
 
+func (c *CreateTopicsResponse) headerVersion() int16 {
+	return 0
+}
+
+func (c *CreateTopicsResponse) isValidVersion() bool {
+	return c.Version >= 0 && c.Version <= 3
+}
+
 func (c *CreateTopicsResponse) requiredVersion() KafkaVersion {
 	switch c.Version {
+	case 3:
+		return V2_0_0_0
 	case 2:
-		return V1_0_0_0
-	case 1:
 		return V0_11_0_0
-	default:
+	case 1:
+		return V0_10_2_0
+	case 0:
 		return V0_10_1_0
+	default:
+		return V2_8_0_0
 	}
+}
+
+func (r *CreateTopicsResponse) throttleTime() time.Duration {
+	return r.ThrottleTime
 }
 
 type TopicError struct {
@@ -92,6 +116,10 @@ func (t *TopicError) Error() string {
 		text = fmt.Sprintf("%s - %s", text, *t.ErrMsg)
 	}
 	return text
+}
+
+func (t *TopicError) Unwrap() error {
+	return t.Err
 }
 
 func (t *TopicError) encode(pe packetEncoder, version int16) error {

@@ -9,12 +9,13 @@ import (
 	"strings"
 )
 
+// enumerate all index types
 const (
 	IndexType = iota + 1
 	UniqueType
 )
 
-// database index
+// Index represents a database index
 type Index struct {
 	IsRegular bool
 	Name      string
@@ -25,8 +26,8 @@ type Index struct {
 func (index *Index) XName(tableName string) string {
 	if !strings.HasPrefix(index.Name, "UQE_") &&
 		!strings.HasPrefix(index.Name, "IDX_") {
-		tableName = strings.Replace(tableName, `"`, "", -1)
-		tableName = strings.Replace(tableName, `.`, "_", -1)
+		tableParts := strings.Split(strings.Replace(tableName, `"`, "", -1), ".")
+		tableName = tableParts[len(tableParts)-1]
 		if index.Type == UniqueType {
 			return fmt.Sprintf("UQE_%v_%v", tableName, index.Name)
 		}
@@ -35,7 +36,7 @@ func (index *Index) XName(tableName string) string {
 	return index.Name
 }
 
-// add columns which will be composite index
+// AddColumn add columns which will be composite index
 func (index *Index) AddColumn(cols ...string) {
 	for _, col := range cols {
 		index.Cols = append(index.Cols, col)
@@ -65,7 +66,7 @@ func (index *Index) Equal(dst *Index) bool {
 	return true
 }
 
-// new an index
+// NewIndex new an index object
 func NewIndex(name string, indexType int) *Index {
 	return &Index{true, name, indexType, make([]string, 0)}
 }

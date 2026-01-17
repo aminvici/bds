@@ -5,13 +5,18 @@ import (
 	"strconv"
 )
 
-//ConsumerMetadataResponse holds the response for a consumer group meta data requests
+// ConsumerMetadataResponse holds the response for a consumer group meta data requests
 type ConsumerMetadataResponse struct {
+	Version         int16
 	Err             KError
 	Coordinator     *Broker
 	CoordinatorID   int32  // deprecated: use Coordinator.ID()
 	CoordinatorHost string // deprecated: use Coordinator.Addr()
 	CoordinatorPort int32  // deprecated: use Coordinator.Addr()
+}
+
+func (r *ConsumerMetadataResponse) setVersion(v int16) {
+	r.Version = v
 }
 
 func (r *ConsumerMetadataResponse) decode(pd packetDecoder, version int16) (err error) {
@@ -53,7 +58,7 @@ func (r *ConsumerMetadataResponse) encode(pe packetEncoder) error {
 	}
 
 	tmp := &FindCoordinatorResponse{
-		Version:     0,
+		Version:     r.Version,
 		Err:         r.Err,
 		Coordinator: r.Coordinator,
 	}
@@ -66,13 +71,28 @@ func (r *ConsumerMetadataResponse) encode(pe packetEncoder) error {
 }
 
 func (r *ConsumerMetadataResponse) key() int16 {
-	return 10
+	return apiKeyFindCoordinator
 }
 
 func (r *ConsumerMetadataResponse) version() int16 {
+	return r.Version
+}
+
+func (r *ConsumerMetadataResponse) headerVersion() int16 {
 	return 0
 }
 
+func (r *ConsumerMetadataResponse) isValidVersion() bool {
+	return r.Version >= 0 && r.Version <= 2
+}
+
 func (r *ConsumerMetadataResponse) requiredVersion() KafkaVersion {
-	return V0_8_2_0
+	switch r.Version {
+	case 2:
+		return V2_0_0_0
+	case 1:
+		return V0_11_0_0
+	default:
+		return V0_8_2_0
+	}
 }

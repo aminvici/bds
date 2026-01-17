@@ -11,6 +11,9 @@ type protocolBody interface {
 	versionedDecoder
 	key() int16
 	version() int16
+	setVersion(int16)
+	headerVersion() int16
+	isValidVersion() bool
 	requiredVersion() KafkaVersion
 }
 
@@ -26,12 +29,19 @@ func (r *request) encode(pe packetEncoder) error {
 	pe.putInt16(r.body.version())
 	pe.putInt32(r.correlationID)
 
-	err := pe.putString(r.clientID)
-	if err != nil {
-		return err
+	if r.body.headerVersion() >= 1 {
+		err := pe.putString(r.clientID)
+		if err != nil {
+			return err
+		}
 	}
 
-	err = r.body.encode(pe)
+	if r.body.headerVersion() >= 2 {
+		// we don't use tag headers at the moment so we just put an array length of 0
+		pe.putUVarint(0)
+	}
+
+	err := r.body.encode(pe)
 	if err != nil {
 		return err
 	}
@@ -65,6 +75,14 @@ func (r *request) decode(pd packetDecoder) (err error) {
 		return PacketDecodingError{fmt.Sprintf("unknown request key (%d)", key)}
 	}
 
+	if r.body.headerVersion() >= 2 {
+		// tagged field
+		_, err = pd.getUVarint()
+		if err != nil {
+			return err
+		}
+	}
+
 	return r.body.decode(pd, version)
 }
 
@@ -93,7 +111,7 @@ func decodeRequest(r io.Reader) (*request, int, error) {
 	bytesRead += len(encodedReq)
 
 	req := &request{}
-	if err := decode(encodedReq, req); err != nil {
+	if err := decode(encodedReq, req, nil); err != nil {
 		return nil, bytesRead, err
 	}
 
@@ -102,68 +120,116 @@ func decodeRequest(r io.Reader) (*request, int, error) {
 
 func allocateBody(key, version int16) protocolBody {
 	switch key {
-	case 0:
-		return &ProduceRequest{}
-	case 1:
-		return &FetchRequest{}
-	case 2:
+	case apiKeyProduce:
+		return &ProduceRequest{Version: version}
+	case apiKeyFetch:
+		return &FetchRequest{Version: version}
+	case apiKeyListOffsets:
 		return &OffsetRequest{Version: version}
-	case 3:
-		return &MetadataRequest{}
-	case 8:
+	case apiKeyMetadata:
+		return &MetadataRequest{Version: version}
+	// 4: LeaderAndIsrRequest
+	// 5: StopReplicaRequest
+	// 6: UpdateMetadataRequest
+	// 7: ControlledShutdownRequest
+	case apiKeyOffsetCommit:
 		return &OffsetCommitRequest{Version: version}
-	case 9:
-		return &OffsetFetchRequest{}
-	case 10:
-		return &FindCoordinatorRequest{}
-	case 11:
-		return &JoinGroupRequest{}
-	case 12:
-		return &HeartbeatRequest{}
-	case 13:
-		return &LeaveGroupRequest{}
-	case 14:
-		return &SyncGroupRequest{}
-	case 15:
-		return &DescribeGroupsRequest{}
-	case 16:
-		return &ListGroupsRequest{}
-	case 17:
-		return &SaslHandshakeRequest{}
-	case 18:
-		return &ApiVersionsRequest{}
-	case 19:
-		return &CreateTopicsRequest{}
-	case 20:
-		return &DeleteTopicsRequest{}
-	case 21:
-		return &DeleteRecordsRequest{}
-	case 22:
-		return &InitProducerIDRequest{}
-	case 24:
-		return &AddPartitionsToTxnRequest{}
-	case 25:
-		return &AddOffsetsToTxnRequest{}
-	case 26:
-		return &EndTxnRequest{}
-	case 28:
-		return &TxnOffsetCommitRequest{}
-	case 29:
-		return &DescribeAclsRequest{}
-	case 30:
-		return &CreateAclsRequest{}
-	case 31:
-		return &DeleteAclsRequest{}
-	case 32:
-		return &DescribeConfigsRequest{}
-	case 33:
-		return &AlterConfigsRequest{}
-	case 36:
-		return &SaslAuthenticateRequest{}
-	case 37:
-		return &CreatePartitionsRequest{}
-	case 42:
-		return &DeleteGroupsRequest{}
+	case apiKeyOffsetFetch:
+		return &OffsetFetchRequest{Version: version}
+	case apiKeyFindCoordinator:
+		return &FindCoordinatorRequest{Version: version}
+	case apiKeyJoinGroup:
+		return &JoinGroupRequest{Version: version}
+	case apiKeyHeartbeat:
+		return &HeartbeatRequest{Version: version}
+	case apiKeyLeaveGroup:
+		return &LeaveGroupRequest{Version: version}
+	case apiKeySyncGroup:
+		return &SyncGroupRequest{Version: version}
+	case apiKeyDescribeGroups:
+		return &DescribeGroupsRequest{Version: version}
+	case apiKeyListGroups:
+		return &ListGroupsRequest{Version: version}
+	case apiKeySaslHandshake:
+		return &SaslHandshakeRequest{Version: version}
+	case apiKeyApiVersions:
+		return &ApiVersionsRequest{Version: version}
+	case apiKeyCreateTopics:
+		return &CreateTopicsRequest{Version: version}
+	case apiKeyDeleteTopics:
+		return &DeleteTopicsRequest{Version: version}
+	case apiKeyDeleteRecords:
+		return &DeleteRecordsRequest{Version: version}
+	case apiKeyInitProducerId:
+		return &InitProducerIDRequest{Version: version}
+	// 23: OffsetForLeaderEpochRequest
+	case apiKeyAddPartitionsToTxn:
+		return &AddPartitionsToTxnRequest{Version: version}
+	case apiKeyAddOffsetsToTxn:
+		return &AddOffsetsToTxnRequest{Version: version}
+	case apiKeyEndTxn:
+		return &EndTxnRequest{Version: version}
+	// 27: WriteTxnMarkersRequest
+	case apiKeyTxnOffsetCommit:
+		return &TxnOffsetCommitRequest{Version: version}
+	case apiKeyDescribeAcls:
+		return &DescribeAclsRequest{Version: int(version)}
+	case apiKeyCreateAcls:
+		return &CreateAclsRequest{Version: version}
+	case apiKeyDeleteAcls:
+		return &DeleteAclsRequest{Version: int(version)}
+	case apiKeyDescribeConfigs:
+		return &DescribeConfigsRequest{Version: version}
+	case apiKeyAlterConfigs:
+		return &AlterConfigsRequest{Version: version}
+	// 34: AlterReplicaLogDirsRequest
+	case apiKeyDescribeLogDirs:
+		return &DescribeLogDirsRequest{Version: version}
+	case apiKeySASLAuth:
+		return &SaslAuthenticateRequest{Version: version}
+	case apiKeyCreatePartitions:
+		return &CreatePartitionsRequest{Version: version}
+	// 38: CreateDelegationTokenRequest
+	// 39: RenewDelegationTokenRequest
+	// 40: ExpireDelegationTokenRequest
+	// 41: DescribeDelegationTokenRequest
+	case apiKeyDeleteGroups:
+		return &DeleteGroupsRequest{Version: version}
+	case apiKeyElectLeaders:
+		return &ElectLeadersRequest{Version: version}
+	case apiKeyIncrementalAlterConfigs:
+		return &IncrementalAlterConfigsRequest{Version: version}
+	case apiKeyAlterPartitionReassignments:
+		return &AlterPartitionReassignmentsRequest{Version: version}
+	case apiKeyListPartitionReassignments:
+		return &ListPartitionReassignmentsRequest{Version: version}
+	case apiKeyOffsetDelete:
+		return &DeleteOffsetsRequest{Version: version}
+	case apiKeyDescribeClientQuotas:
+		return &DescribeClientQuotasRequest{Version: version}
+	case apiKeyAlterClientQuotas:
+		return &AlterClientQuotasRequest{Version: version}
+	case apiKeyDescribeUserScramCredentials:
+		return &DescribeUserScramCredentialsRequest{Version: version}
+	case apiKeyAlterUserScramCredentials:
+		return &AlterUserScramCredentialsRequest{Version: version}
+		// 52: VoteRequest
+		// 53: BeginQuorumEpochRequest
+		// 54: EndQuorumEpochRequest
+		// 55: DescribeQuorumRequest
+		// 56: AlterPartitionRequest
+		// 57: UpdateFeaturesRequest
+		// 58: EnvelopeRequest
+		// 59: FetchSnapshotRequest
+		// 60: DescribeClusterRequest
+		// 61: DescribeProducersRequest
+		// 62: BrokerRegistrationRequest
+		// 63: BrokerHeartbeatRequest
+		// 64: UnregisterBrokerRequest
+		// 65: DescribeTransactionsRequest
+		// 66: ListTransactionsRequest
+		// 67: AllocateProducerIdsRequest
+		// 68: ConsumerGroupHeartbeatRequest
 	}
 	return nil
 }

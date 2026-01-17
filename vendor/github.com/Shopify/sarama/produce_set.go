@@ -13,17 +13,22 @@ type partitionSet struct {
 }
 
 type produceSet struct {
-	parent *asyncProducer
-	msgs   map[string]map[int32]*partitionSet
+	parent        *asyncProducer
+	msgs          map[string]map[int32]*partitionSet
+	producerID    int64
+	producerEpoch int16
 
 	bufferBytes int
 	bufferCount int
 }
 
 func newProduceSet(parent *asyncProducer) *produceSet {
+	pid, epoch := parent.txnmgr.getProducerID()
 	return &produceSet{
-		msgs:   make(map[string]map[int32]*partitionSet),
-		parent: parent,
+		msgs:          make(map[string]map[int32]*partitionSet),
+		parent:        parent,
+		producerID:    pid,
+		producerEpoch: epoch,
 	}
 }
 
@@ -44,9 +49,10 @@ func (ps *produceSet) add(msg *ProducerMessage) error {
 	}
 
 	timestamp := msg.Timestamp
-	if msg.Timestamp.IsZero() {
+	if timestamp.IsZero() {
 		timestamp = time.Now()
 	}
+	timestamp = timestamp.Truncate(time.Millisecond)
 
 	partitions := ps.msgs[msg.Topic]
 	if partitions == nil {
@@ -64,8 +70,8 @@ func (ps *produceSet) add(msg *ProducerMessage) error {
 				Version:          2,
 				Codec:            ps.parent.conf.Producer.Compression,
 				CompressionLevel: ps.parent.conf.Producer.CompressionLevel,
-				ProducerID:       ps.parent.txnmgr.producerID,
-				ProducerEpoch:    ps.parent.txnmgr.producerEpoch,
+				ProducerID:       ps.producerID,
+				ProducerEpoch:    ps.producerEpoch,
 			}
 			if ps.parent.conf.Producer.Idempotent {
 				batch.FirstSequence = msg.sequenceNumber
@@ -77,12 +83,17 @@ func (ps *produceSet) add(msg *ProducerMessage) error {
 		}
 		partitions[msg.Partition] = set
 	}
-	set.msgs = append(set.msgs, msg)
 
 	if ps.parent.conf.Version.IsAtLeast(V0_11_0_0) {
 		if ps.parent.conf.Producer.Idempotent && msg.sequenceNumber < set.recordsToSend.RecordBatch.FirstSequence {
 			return errors.New("assertion failed: message out of sequence added to a batch")
 		}
+	}
+
+	// Past this point we can't return an error, because we've already added the message to the set.
+	set.msgs = append(set.msgs, msg)
+
+	if ps.parent.conf.Version.IsAtLeast(V0_11_0_0) {
 		// We are being conservative here to avoid having to prep encode the record
 		size += maximumRecordOverhead
 		rec := &Record{
@@ -126,6 +137,18 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 	}
 	if ps.parent.conf.Version.IsAtLeast(V0_11_0_0) {
 		req.Version = 3
+		if ps.parent.IsTransactional() {
+			req.TransactionalID = &ps.parent.conf.Producer.Transaction.ID
+		}
+	}
+	if ps.parent.conf.Version.IsAtLeast(V1_0_0_0) {
+		req.Version = 5
+	}
+	if ps.parent.conf.Version.IsAtLeast(V2_0_0_0) {
+		req.Version = 6
+	}
+	if ps.parent.conf.Version.IsAtLeast(V2_1_0_0) {
+		req.Version = 7
 	}
 
 	for topic, partitionSets := range ps.msgs {
@@ -141,10 +164,18 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 				rb := set.recordsToSend.RecordBatch
 				if len(rb.Records) > 0 {
 					rb.LastOffsetDelta = int32(len(rb.Records) - 1)
+					var maxTimestampDelta time.Duration
 					for i, record := range rb.Records {
 						record.OffsetDelta = int64(i)
+						maxTimestampDelta = max(maxTimestampDelta, record.TimestampDelta)
 					}
+					// Also set the MaxTimestamp similar to other clients.
+					rb.MaxTimestamp = rb.FirstTimestamp.Add(maxTimestampDelta)
 				}
+
+				// Set the batch as transactional when a transactionalID is set
+				rb.IsTransactional = ps.parent.IsTransactional()
+
 				req.AddBatch(topic, partition, rb)
 				continue
 			}
@@ -166,7 +197,7 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 						msg.Offset = int64(i)
 					}
 				}
-				payload, err := encode(set.recordsToSend.MsgSet, ps.parent.conf.MetricRegistry)
+				payload, err := encode(set.recordsToSend.MsgSet, ps.parent.metricsRegistry)
 				if err != nil {
 					Logger.Println(err) // if this happens, it's basically our fault.
 					panic(err)
@@ -220,11 +251,11 @@ func (ps *produceSet) wouldOverflow(msg *ProducerMessage) bool {
 
 	switch {
 	// Would we overflow our maximum possible size-on-the-wire? 10KiB is arbitrary overhead for safety.
-	case ps.bufferBytes+msg.byteSize(version) >= int(MaxRequestSize-(10*1024)):
+	case ps.bufferBytes+msg.ByteSize(version) >= int(MaxRequestSize-(10*1024)):
 		return true
 	// Would we overflow the size-limit of a message-batch for this partition?
 	case ps.msgs[msg.Topic] != nil && ps.msgs[msg.Topic][msg.Partition] != nil &&
-		ps.msgs[msg.Topic][msg.Partition].bufferBytes+msg.byteSize(version) >= ps.parent.conf.Producer.MaxMessageBytes:
+		ps.msgs[msg.Topic][msg.Partition].bufferBytes+msg.ByteSize(version) >= ps.parent.conf.Producer.MaxMessageBytes:
 		return true
 	// Would we overflow simply in number of messages?
 	case ps.parent.conf.Producer.Flush.MaxMessages > 0 && ps.bufferCount >= ps.parent.conf.Producer.Flush.MaxMessages:

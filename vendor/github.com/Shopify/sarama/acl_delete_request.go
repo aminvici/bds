@@ -1,9 +1,13 @@
 package sarama
 
-//DeleteAclsRequest is a delete acl request
+// DeleteAclsRequest is a delete acl request
 type DeleteAclsRequest struct {
 	Version int
 	Filters []*AclFilter
+}
+
+func (d *DeleteAclsRequest) setVersion(v int16) {
+	d.Version = int(v)
 }
 
 func (d *DeleteAclsRequest) encode(pe packetEncoder) error {
@@ -41,11 +45,19 @@ func (d *DeleteAclsRequest) decode(pd packetDecoder, version int16) (err error) 
 }
 
 func (d *DeleteAclsRequest) key() int16 {
-	return 31
+	return apiKeyDeleteAcls
 }
 
 func (d *DeleteAclsRequest) version() int16 {
 	return int16(d.Version)
+}
+
+func (d *DeleteAclsRequest) headerVersion() int16 {
+	return 1
+}
+
+func (d *DeleteAclsRequest) isValidVersion() bool {
+	return d.Version >= 0 && d.Version <= 1
 }
 
 func (d *DeleteAclsRequest) requiredVersion() KafkaVersion {

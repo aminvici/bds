@@ -2,13 +2,12 @@ package sarama
 
 import (
 	"bytes"
-	"compress/gzip"
 	"fmt"
-	"io/ioutil"
 	"sync"
 
-	"github.com/eapache/go-xerial-snappy"
-	"github.com/pierrec/lz4"
+	snappy "github.com/eapache/go-xerial-snappy"
+	"github.com/klauspost/compress/gzip"
+	"github.com/pierrec/lz4/v4"
 )
 
 var (
@@ -19,6 +18,19 @@ var (
 	}
 
 	gzipReaderPool sync.Pool
+
+	bufferPool = sync.Pool{
+		New: func() interface{} {
+			return new(bytes.Buffer)
+		},
+	}
+
+	bytesPool = sync.Pool{
+		New: func() interface{} {
+			res := make([]byte, 0, 4096)
+			return &res
+		},
+	}
 )
 
 func decompress(cc CompressionCodec, data []byte) ([]byte, error) {
@@ -26,37 +38,60 @@ func decompress(cc CompressionCodec, data []byte) ([]byte, error) {
 	case CompressionNone:
 		return data, nil
 	case CompressionGZIP:
-		var (
-			err        error
-			reader     *gzip.Reader
-			readerIntf = gzipReaderPool.Get()
-		)
-		if readerIntf != nil {
-			reader = readerIntf.(*gzip.Reader)
-		} else {
+		var err error
+		reader, ok := gzipReaderPool.Get().(*gzip.Reader)
+		if !ok {
 			reader, err = gzip.NewReader(bytes.NewReader(data))
-			if err != nil {
-				return nil, err
-			}
+		} else {
+			err = reader.Reset(bytes.NewReader(data))
 		}
 
-		defer gzipReaderPool.Put(reader)
-
-		if err := reader.Reset(bytes.NewReader(data)); err != nil {
+		if err != nil {
 			return nil, err
 		}
 
-		return ioutil.ReadAll(reader)
+		buffer := bufferPool.Get().(*bytes.Buffer)
+		_, err = buffer.ReadFrom(reader)
+		// copy the buffer to a new slice with the correct length
+		// reuse gzipReader and buffer
+		gzipReaderPool.Put(reader)
+		res := make([]byte, buffer.Len())
+		copy(res, buffer.Bytes())
+		buffer.Reset()
+		bufferPool.Put(buffer)
+
+		return res, err
 	case CompressionSnappy:
 		return snappy.Decode(data)
 	case CompressionLZ4:
-		reader := lz4ReaderPool.Get().(*lz4.Reader)
-		defer lz4ReaderPool.Put(reader)
+		reader, ok := lz4ReaderPool.Get().(*lz4.Reader)
+		if !ok {
+			reader = lz4.NewReader(bytes.NewReader(data))
+		} else {
+			reader.Reset(bytes.NewReader(data))
+		}
+		buffer := bufferPool.Get().(*bytes.Buffer)
+		_, err := buffer.ReadFrom(reader)
+		// copy the buffer to a new slice with the correct length
+		// reuse lz4Reader and buffer
+		lz4ReaderPool.Put(reader)
+		res := make([]byte, buffer.Len())
+		copy(res, buffer.Bytes())
+		buffer.Reset()
+		bufferPool.Put(buffer)
 
-		reader.Reset(bytes.NewReader(data))
-		return ioutil.ReadAll(reader)
+		return res, err
 	case CompressionZSTD:
-		return zstdDecompress(nil, data)
+		buffer := *bytesPool.Get().(*[]byte)
+		var err error
+		buffer, err = zstdDecompress(ZstdDecoderParams{}, buffer, data)
+		// copy the buffer to a new slice with the correct length and reuse buffer
+		res := make([]byte, len(buffer))
+		copy(res, buffer)
+		buffer = buffer[:0]
+		bytesPool.Put(&buffer)
+
+		return res, err
 	default:
 		return nil, PacketDecodingError{fmt.Sprintf("invalid compression specified (%d)", cc)}
 	}

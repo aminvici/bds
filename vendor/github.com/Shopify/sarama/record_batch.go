@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"errors"
 	"fmt"
 	"time"
 )
@@ -19,12 +20,12 @@ func (e recordsArray) encode(pe packetEncoder) error {
 }
 
 func (e recordsArray) decode(pd packetDecoder) error {
+	records := make([]Record, len(e))
 	for i := range e {
-		rec := &Record{}
-		if err := rec.decode(pd); err != nil {
+		if err := records[i].decode(pd); err != nil {
 			return err
 		}
-		e[i] = rec
+		e[i] = &records[i]
 	}
 	return nil
 }
@@ -57,7 +58,7 @@ func (b *RecordBatch) LastOffset() int64 {
 
 func (b *RecordBatch) encode(pe packetEncoder) error {
 	if b.Version != 2 {
-		return PacketEncodingError{fmt.Sprintf("unsupported compression codec (%d)", b.Codec)}
+		return PacketEncodingError{fmt.Sprintf("unsupported record batch version (%d)", b.Version)}
 	}
 	pe.putInt64(b.FirstOffset)
 	pe.push(&lengthField{})
@@ -116,7 +117,10 @@ func (b *RecordBatch) decode(pd packetDecoder) (err error) {
 		return err
 	}
 
-	if err = pd.push(&crc32Field{polynomial: crcCastagnoli}); err != nil {
+	crc32Decoder := acquireCrc32Field(crcCastagnoli)
+	defer releaseCrc32Field(crc32Decoder)
+
+	if err = pd.push(crc32Decoder); err != nil {
 		return err
 	}
 
@@ -164,7 +168,7 @@ func (b *RecordBatch) decode(pd packetDecoder) (err error) {
 	bufSize := int(batchLen) - recordBatchOverhead
 	recBuffer, err := pd.getRawBytes(bufSize)
 	if err != nil {
-		if err == ErrInsufficientData {
+		if errors.Is(err, ErrInsufficientData) {
 			b.PartialTrailingRecord = true
 			b.Records = nil
 			return nil
@@ -182,8 +186,8 @@ func (b *RecordBatch) decode(pd packetDecoder) (err error) {
 	}
 
 	b.recordsLen = len(recBuffer)
-	err = decode(recBuffer, recordsArray(b.Records))
-	if err == ErrInsufficientData {
+	err = decode(recBuffer, recordsArray(b.Records), nil)
+	if errors.Is(err, ErrInsufficientData) {
 		b.PartialTrailingRecord = true
 		b.Records = nil
 		return nil

@@ -2,13 +2,17 @@ package sarama
 
 import "time"
 
-//DescribeAclsResponse is a describe acl response type
+// DescribeAclsResponse is a describe acl response type
 type DescribeAclsResponse struct {
 	Version      int16
 	ThrottleTime time.Duration
 	Err          KError
 	ErrMsg       *string
 	ResourceAcls []*ResourceAcls
+}
+
+func (d *DescribeAclsResponse) setVersion(v int16) {
+	d.Version = v
 }
 
 func (d *DescribeAclsResponse) encode(pe packetEncoder) error {
@@ -70,11 +74,19 @@ func (d *DescribeAclsResponse) decode(pd packetDecoder, version int16) (err erro
 }
 
 func (d *DescribeAclsResponse) key() int16 {
-	return 29
+	return apiKeyDescribeAcls
 }
 
 func (d *DescribeAclsResponse) version() int16 {
-	return int16(d.Version)
+	return d.Version
+}
+
+func (d *DescribeAclsResponse) headerVersion() int16 {
+	return 0
+}
+
+func (d *DescribeAclsResponse) isValidVersion() bool {
+	return d.Version >= 0 && d.Version <= 1
 }
 
 func (d *DescribeAclsResponse) requiredVersion() KafkaVersion {
@@ -84,4 +96,8 @@ func (d *DescribeAclsResponse) requiredVersion() KafkaVersion {
 	default:
 		return V0_11_0_0
 	}
+}
+
+func (r *DescribeAclsResponse) throttleTime() time.Duration {
+	return r.ThrottleTime
 }

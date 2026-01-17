@@ -6,8 +6,13 @@ import (
 )
 
 type CreatePartitionsResponse struct {
+	Version              int16
 	ThrottleTime         time.Duration
 	TopicPartitionErrors map[string]*TopicPartitionError
+}
+
+func (c *CreatePartitionsResponse) setVersion(v int16) {
+	c.Version = v
 }
 
 func (c *CreatePartitionsResponse) encode(pe packetEncoder) error {
@@ -56,15 +61,34 @@ func (c *CreatePartitionsResponse) decode(pd packetDecoder, version int16) (err 
 }
 
 func (r *CreatePartitionsResponse) key() int16 {
-	return 37
+	return apiKeyCreatePartitions
 }
 
 func (r *CreatePartitionsResponse) version() int16 {
+	return r.Version
+}
+
+func (r *CreatePartitionsResponse) headerVersion() int16 {
 	return 0
 }
 
+func (r *CreatePartitionsResponse) isValidVersion() bool {
+	return r.Version >= 0 && r.Version <= 1
+}
+
 func (r *CreatePartitionsResponse) requiredVersion() KafkaVersion {
-	return V1_0_0_0
+	switch r.Version {
+	case 1:
+		return V2_0_0_0
+	case 0:
+		return V1_0_0_0
+	default:
+		return V2_0_0_0
+	}
+}
+
+func (r *CreatePartitionsResponse) throttleTime() time.Duration {
+	return r.ThrottleTime
 }
 
 type TopicPartitionError struct {
@@ -78,6 +102,10 @@ func (t *TopicPartitionError) Error() string {
 		text = fmt.Sprintf("%s - %s", text, *t.ErrMsg)
 	}
 	return text
+}
+
+func (t *TopicPartitionError) Unwrap() error {
+	return t.Err
 }
 
 func (t *TopicPartitionError) encode(pe packetEncoder) error {

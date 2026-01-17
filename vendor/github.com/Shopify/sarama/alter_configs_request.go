@@ -1,12 +1,17 @@
 package sarama
 
-//AlterConfigsRequest is an alter config request type
+// AlterConfigsRequest is an alter config request type
 type AlterConfigsRequest struct {
+	Version      int16
 	Resources    []*AlterConfigsResource
 	ValidateOnly bool
 }
 
-//AlterConfigsResource is an alter config resource type
+func (a *AlterConfigsRequest) setVersion(v int16) {
+	a.Version = v
+}
+
+// AlterConfigsResource is an alter config resource type
 type AlterConfigsResource struct {
 	Type          ConfigResourceType
 	Name          string
@@ -110,13 +115,28 @@ func (a *AlterConfigsResource) decode(pd packetDecoder, version int16) error {
 }
 
 func (a *AlterConfigsRequest) key() int16 {
-	return 33
+	return apiKeyAlterConfigs
 }
 
 func (a *AlterConfigsRequest) version() int16 {
-	return 0
+	return a.Version
+}
+
+func (a *AlterConfigsRequest) headerVersion() int16 {
+	return 1
+}
+
+func (a *AlterConfigsRequest) isValidVersion() bool {
+	return a.Version >= 0 && a.Version <= 1
 }
 
 func (a *AlterConfigsRequest) requiredVersion() KafkaVersion {
-	return V0_11_0_0
+	switch a.Version {
+	case 1:
+		return V2_0_0_0
+	case 0:
+		return V0_11_0_0
+	default:
+		return V2_0_0_0
+	}
 }

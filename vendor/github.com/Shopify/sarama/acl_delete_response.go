@@ -2,11 +2,15 @@ package sarama
 
 import "time"
 
-//DeleteAclsResponse is a delete acl response
+// DeleteAclsResponse is a delete acl response
 type DeleteAclsResponse struct {
 	Version         int16
 	ThrottleTime    time.Duration
 	FilterResponses []*FilterResponse
+}
+
+func (d *DeleteAclsResponse) setVersion(v int16) {
+	d.Version = v
 }
 
 func (d *DeleteAclsResponse) encode(pe packetEncoder) error {
@@ -49,18 +53,35 @@ func (d *DeleteAclsResponse) decode(pd packetDecoder, version int16) (err error)
 }
 
 func (d *DeleteAclsResponse) key() int16 {
-	return 31
+	return apiKeyDeleteAcls
 }
 
 func (d *DeleteAclsResponse) version() int16 {
-	return int16(d.Version)
+	return d.Version
+}
+
+func (d *DeleteAclsResponse) headerVersion() int16 {
+	return 0
+}
+
+func (d *DeleteAclsResponse) isValidVersion() bool {
+	return d.Version >= 0 && d.Version <= 1
 }
 
 func (d *DeleteAclsResponse) requiredVersion() KafkaVersion {
-	return V0_11_0_0
+	switch d.Version {
+	case 1:
+		return V2_0_0_0
+	default:
+		return V0_11_0_0
+	}
 }
 
-//FilterResponse is a filter response type
+func (r *DeleteAclsResponse) throttleTime() time.Duration {
+	return r.ThrottleTime
+}
+
+// FilterResponse is a filter response type
 type FilterResponse struct {
 	Err          KError
 	ErrMsg       *string
@@ -111,7 +132,7 @@ func (f *FilterResponse) decode(pd packetDecoder, version int16) (err error) {
 	return nil
 }
 
-//MatchingAcl is a matching acl type
+// MatchingAcl is a matching acl type
 type MatchingAcl struct {
 	Err    KError
 	ErrMsg *string

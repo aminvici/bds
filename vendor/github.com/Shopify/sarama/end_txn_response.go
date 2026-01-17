@@ -5,8 +5,13 @@ import (
 )
 
 type EndTxnResponse struct {
+	Version      int16
 	ThrottleTime time.Duration
 	Err          KError
+}
+
+func (e *EndTxnResponse) setVersion(v int16) {
+	e.Version = v
 }
 
 func (e *EndTxnResponse) encode(pe packetEncoder) error {
@@ -32,13 +37,32 @@ func (e *EndTxnResponse) decode(pd packetDecoder, version int16) (err error) {
 }
 
 func (e *EndTxnResponse) key() int16 {
-	return 25
+	return apiKeyEndTxn
 }
 
 func (e *EndTxnResponse) version() int16 {
+	return e.Version
+}
+
+func (r *EndTxnResponse) headerVersion() int16 {
 	return 0
 }
 
+func (e *EndTxnResponse) isValidVersion() bool {
+	return e.Version >= 0 && e.Version <= 2
+}
+
 func (e *EndTxnResponse) requiredVersion() KafkaVersion {
-	return V0_11_0_0
+	switch e.Version {
+	case 2:
+		return V2_7_0_0
+	case 1:
+		return V2_0_0_0
+	default:
+		return V0_11_0_0
+	}
+}
+
+func (r *EndTxnResponse) throttleTime() time.Duration {
+	return r.ThrottleTime
 }

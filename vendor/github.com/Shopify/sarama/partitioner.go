@@ -2,6 +2,7 @@ package sarama
 
 import (
 	"hash"
+	"hash/crc32"
 	"hash/fnv"
 	"math/rand"
 	"time"
@@ -42,7 +43,7 @@ type PartitionerConstructor func(topic string) Partitioner
 
 type manualPartitioner struct{}
 
-// HashPartitionOption lets you modify default values of the partitioner
+// HashPartitionerOption lets you modify default values of the partitioner
 type HashPartitionerOption func(*hashPartitioner)
 
 // WithAbsFirst means that the partitioner handles absolute values
@@ -50,6 +51,15 @@ type HashPartitionerOption func(*hashPartitioner)
 func WithAbsFirst() HashPartitionerOption {
 	return func(hp *hashPartitioner) {
 		hp.referenceAbs = true
+	}
+}
+
+// WithHashUnsigned means the partitioner treats the hashed value as unsigned when
+// partitioning.  This is intended to be combined with the crc32 hash algorithm to
+// be compatible with librdkafka's implementation
+func WithHashUnsigned() HashPartitionerOption {
+	return func(hp *hashPartitioner) {
+		hp.hashUnsigned = true
 	}
 }
 
@@ -61,9 +71,9 @@ func WithCustomHashFunction(hasher func() hash.Hash32) HashPartitionerOption {
 }
 
 // WithCustomFallbackPartitioner lets you specify what HashPartitioner should be used in case a Distribution Key is empty
-func WithCustomFallbackPartitioner(randomHP *hashPartitioner) HashPartitionerOption {
+func WithCustomFallbackPartitioner(randomHP Partitioner) HashPartitionerOption {
 	return func(hp *hashPartitioner) {
-		hp.random = hp
+		hp.random = randomHP
 	}
 }
 
@@ -126,6 +136,7 @@ type hashPartitioner struct {
 	random       Partitioner
 	hasher       hash.Hash32
 	referenceAbs bool
+	hashUnsigned bool
 }
 
 // NewCustomHashPartitioner is a wrapper around NewHashPartitioner, allowing the use of custom hasher.
@@ -137,6 +148,7 @@ func NewCustomHashPartitioner(hasher func() hash.Hash32) PartitionerConstructor 
 		p.random = NewRandomPartitioner(topic)
 		p.hasher = hasher()
 		p.referenceAbs = false
+		p.hashUnsigned = false
 		return p
 	}
 }
@@ -148,6 +160,7 @@ func NewCustomPartitioner(options ...HashPartitionerOption) PartitionerConstruct
 		p.random = NewRandomPartitioner(topic)
 		p.hasher = fnv.New32a()
 		p.referenceAbs = false
+		p.hashUnsigned = false
 		for _, option := range options {
 			option(p)
 		}
@@ -164,18 +177,32 @@ func NewHashPartitioner(topic string) Partitioner {
 	p.random = NewRandomPartitioner(topic)
 	p.hasher = fnv.New32a()
 	p.referenceAbs = false
+	p.hashUnsigned = false
 	return p
 }
 
 // NewReferenceHashPartitioner is like NewHashPartitioner except that it handles absolute values
 // in the same way as the reference Java implementation. NewHashPartitioner was supposed to do
-// that but it had a mistake and now there are people depending on both behaviours. This will
+// that but it had a mistake and now there are people depending on both behaviors. This will
 // all go away on the next major version bump.
 func NewReferenceHashPartitioner(topic string) Partitioner {
 	p := new(hashPartitioner)
 	p.random = NewRandomPartitioner(topic)
 	p.hasher = fnv.New32a()
 	p.referenceAbs = true
+	p.hashUnsigned = false
+	return p
+}
+
+// NewConsistentCRCHashPartitioner is like NewHashPartitioner execpt that it uses the *unsigned* crc32 hash
+// of the encoded bytes of the message key modulus the number of partitions.  This is compatible with
+// librdkafka's `consistent_random` partitioner
+func NewConsistentCRCHashPartitioner(topic string) Partitioner {
+	p := new(hashPartitioner)
+	p.random = NewRandomPartitioner(topic)
+	p.hasher = crc32.NewIEEE()
+	p.referenceAbs = false
+	p.hashUnsigned = true
 	return p
 }
 
@@ -199,6 +226,10 @@ func (p *hashPartitioner) Partition(message *ProducerMessage, numPartitions int3
 	// but not past Sarama versions
 	if p.referenceAbs {
 		partition = (int32(p.hasher.Sum32()) & 0x7fffffff) % numPartitions
+	} else if p.hashUnsigned {
+		// librdkafka treats the hashed value as unsigned.  If `hashUnsigned` is set we are compatible
+		// with librdkafka's `consistent` partitioning but not past Sarama versions
+		partition = int32(p.hasher.Sum32() % uint32(numPartitions))
 	} else {
 		partition = int32(p.hasher.Sum32()) % numPartitions
 		if partition < 0 {

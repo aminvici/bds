@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"slices"
 	"sort"
 	"time"
 )
@@ -13,8 +14,13 @@ import (
 //  id(int32) offset(int64)
 
 type DeleteRecordsRequest struct {
+	Version int16
 	Topics  map[string]*DeleteRecordsRequestTopic
 	Timeout time.Duration
+}
+
+func (d *DeleteRecordsRequest) setVersion(v int16) {
+	d.Version = v
 }
 
 func (d *DeleteRecordsRequest) encode(pe packetEncoder) error {
@@ -70,15 +76,28 @@ func (d *DeleteRecordsRequest) decode(pd packetDecoder, version int16) error {
 }
 
 func (d *DeleteRecordsRequest) key() int16 {
-	return 21
+	return apiKeyDeleteRecords
 }
 
 func (d *DeleteRecordsRequest) version() int16 {
-	return 0
+	return d.Version
+}
+
+func (d *DeleteRecordsRequest) headerVersion() int16 {
+	return 1
+}
+
+func (d *DeleteRecordsRequest) isValidVersion() bool {
+	return d.Version >= 0 && d.Version <= 1
 }
 
 func (d *DeleteRecordsRequest) requiredVersion() KafkaVersion {
-	return V0_11_0_0
+	switch d.Version {
+	case 1:
+		return V2_0_0_0
+	default:
+		return V0_11_0_0
+	}
 }
 
 type DeleteRecordsRequestTopic struct {
@@ -93,7 +112,7 @@ func (t *DeleteRecordsRequestTopic) encode(pe packetEncoder) error {
 	for partition := range t.PartitionOffsets {
 		keys = append(keys, partition)
 	}
-	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+	slices.Sort(keys)
 	for _, partition := range keys {
 		pe.putInt32(partition)
 		pe.putInt64(t.PartitionOffsets[partition])

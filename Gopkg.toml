@@ -66,7 +66,7 @@
   version = "1.1.1"
 
 [[constraint]]
-  name = "github.com/kataras/iris"
+  name = "gopkg.in/kataras/iris.v11"
   version = "11.1.1"
 
 [[constraint]]
