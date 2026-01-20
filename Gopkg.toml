@@ -89,3 +89,7 @@
 [[constraint]]
   name = "github.com/pkg/errors"
   version = "0.9.1"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/stellar/go"
