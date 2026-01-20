@@ -1,7 +1,7 @@
 package psutils
 
 import (
-	"github.com/jdcloud-bds/bds/common/pathutils"
+	"github.com/aminvici/bds/common/pathutils"
 	"io/ioutil"
 	"os"
 	"path/filepath"

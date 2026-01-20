@@ -1,8 +1,8 @@
 package btc
 
 import (
-	"github.com/jdcloud-bds/bds/common/metric"
-	model "github.com/jdcloud-bds/bds/service/model/btc"
+	"github.com/aminvici/bds/common/metric"
+	model "github.com/aminvici/bds/service/model/btc"
 )
 
 const (

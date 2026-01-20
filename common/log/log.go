@@ -2,7 +2,7 @@ package log
 
 import (
 	"fmt"
-	jlog "github.com/jdcloud-bds/bds/common/jlog"
+	jlog "github.com/aminvici/bds/common/jlog"
 )
 
 var (

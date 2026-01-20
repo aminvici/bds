@@ -9,7 +9,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/go-xorm/xorm"
 	_ "github.com/greenplum-db/pq"
-	"github.com/jdcloud-bds/bds/common/log"
+	"github.com/aminvici/bds/common/log"
 	"io"
 	"os"
 	"reflect"

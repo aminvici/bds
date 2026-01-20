@@ -2,11 +2,11 @@ package xrp
 
 import (
 	"fmt"
-	"github.com/jdcloud-bds/bds/common/json"
-	"github.com/jdcloud-bds/bds/common/log"
-	"github.com/jdcloud-bds/bds/common/math"
-	"github.com/jdcloud-bds/bds/service"
-	model "github.com/jdcloud-bds/bds/service/model/xrp"
+	"github.com/aminvici/bds/common/json"
+	"github.com/aminvici/bds/common/log"
+	"github.com/aminvici/bds/common/math"
+	"github.com/aminvici/bds/service"
+	model "github.com/aminvici/bds/service/model/xrp"
 	"strings"
 	"time"
 )

@@ -2,7 +2,7 @@ package tron
 
 import (
 	"encoding/json"
-	"github.com/jdcloud-bds/bds/common/httputils"
+	"github.com/aminvici/bds/common/httputils"
 )
 
 type httpHandler struct {

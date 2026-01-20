@@ -4,8 +4,8 @@ import (
 	native_json "encoding/json"
 	"errors"
 	"fmt"
-	"github.com/jdcloud-bds/bds/common/httputils"
-	"github.com/jdcloud-bds/bds/common/json"
+	"github.com/aminvici/bds/common/httputils"
+	"github.com/aminvici/bds/common/json"
 	"reflect"
 	"strconv"
 )

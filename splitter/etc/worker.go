@@ -1,9 +1,9 @@
 package etc
 
 import (
-	"github.com/jdcloud-bds/bds/common/cron"
-	"github.com/jdcloud-bds/bds/common/log"
-	"github.com/jdcloud-bds/bds/config"
+	"github.com/aminvici/bds/common/cron"
+	"github.com/aminvici/bds/common/log"
+	"github.com/aminvici/bds/config"
 )
 
 type CronWorker struct {

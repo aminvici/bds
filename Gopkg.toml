@@ -85,3 +85,7 @@
   name = "github.com/go-xorm/xorm"
   version = "0.7.4"
   source = "gitea.com/xorm/xorm"
+
+[[constraint]]
+  name = "github.com/pkg/errors"
+  version = "0.9.1"

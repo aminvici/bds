@@ -1,7 +1,7 @@
 package etc
 
 import (
-	"github.com/jdcloud-bds/bds/common/math"
+	"github.com/aminvici/bds/common/math"
 )
 
 type Block struct {

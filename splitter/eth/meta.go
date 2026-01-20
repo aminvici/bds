@@ -1,9 +1,9 @@
 package eth
 
 import (
-	"github.com/jdcloud-bds/bds/common/cuckoofilter"
-	"github.com/jdcloud-bds/bds/common/metric"
-	model "github.com/jdcloud-bds/bds/service/model/eth"
+	"github.com/aminvici/bds/common/cuckoofilter"
+	"github.com/aminvici/bds/common/metric"
+	model "github.com/aminvici/bds/service/model/eth"
 	"math/big"
 	"sync"
 )

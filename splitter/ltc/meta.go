@@ -1,8 +1,8 @@
 package ltc
 
 import (
-	"github.com/jdcloud-bds/bds/common/metric"
-	model "github.com/jdcloud-bds/bds/service/model/ltc"
+	"github.com/aminvici/bds/common/metric"
+	model "github.com/aminvici/bds/service/model/ltc"
 )
 
 const (

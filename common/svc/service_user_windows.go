@@ -5,7 +5,7 @@
 package svc
 
 import (
-	"github.com/jdcloud-bds/bds/common/psutils"
+	"github.com/aminvici/bds/common/psutils"
 	"golang.org/x/sys/windows/registry"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/eventlog"

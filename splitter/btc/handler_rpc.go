@@ -1,10 +1,10 @@
 package btc
 
 import (
-	"github.com/jdcloud-bds/bds/common/json"
-	"github.com/jdcloud-bds/bds/common/jsonrpc"
-	"github.com/jdcloud-bds/bds/common/math"
-	model "github.com/jdcloud-bds/bds/service/model/btc"
+	"github.com/aminvici/bds/common/json"
+	"github.com/aminvici/bds/common/jsonrpc"
+	"github.com/aminvici/bds/common/math"
+	model "github.com/aminvici/bds/service/model/btc"
 	"strconv"
 )
 

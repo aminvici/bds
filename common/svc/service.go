@@ -18,7 +18,7 @@
 //	import (
 //		"log"
 //
-//		"github.com/jdcloud-bds/bds/common/svc"
+//		"github.com/aminvici/bds/common/svc"
 //	)
 //
 //	var logger service.Logger
@@ -59,7 +59,7 @@
 //			logger.Error(err)
 //		}
 //	}
-package svc // import "github.com/jdcloud-bds/bds/common/svc"
+package svc // import "github.com/aminvici/bds/common/svc"
 
 import (
 	"errors"

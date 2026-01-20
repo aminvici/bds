@@ -1,7 +1,7 @@
 package bsv
 
 import (
-	"github.com/jdcloud-bds/bds/common/jsonrpc"
+	"github.com/aminvici/bds/common/jsonrpc"
 )
 
 type rpcHandler struct {

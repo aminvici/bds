@@ -1,9 +1,9 @@
 package xlm
 
 import (
-	"github.com/jdcloud-bds/bds/common/json"
-	"github.com/jdcloud-bds/bds/common/log"
-	model "github.com/jdcloud-bds/bds/service/model/xlm"
+	"github.com/aminvici/bds/common/json"
+	"github.com/aminvici/bds/common/log"
+	model "github.com/aminvici/bds/service/model/xlm"
 	"time"
 )
 

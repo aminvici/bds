@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // Extensions to the standard "os" package.
-package svc // import "github.com/jdcloud-bds/bds/common/svc"
+package svc // import "github.com/aminvici/bds/common/svc"
 
 import "path/filepath"
 

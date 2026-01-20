@@ -1,6 +1,6 @@
 package doge
 
-import "github.com/jdcloud-bds/bds/common/math"
+import "github.com/aminvici/bds/common/math"
 
 type StatisticsDayBlock struct {
 	ID               int64                `xorm:"id bigint autoincr pk"`

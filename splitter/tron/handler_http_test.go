@@ -1,7 +1,7 @@
 package tron
 
 import (
-	"github.com/jdcloud-bds/bds/common/httputils"
+	"github.com/aminvici/bds/common/httputils"
 	"testing"
 )
 

@@ -1,8 +1,8 @@
 package bsv
 
 import (
-	"github.com/jdcloud-bds/bds/common/metric"
-	model "github.com/jdcloud-bds/bds/service/model/bsv"
+	"github.com/aminvici/bds/common/metric"
+	model "github.com/aminvici/bds/service/model/bsv"
 )
 
 const (

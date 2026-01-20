@@ -1,7 +1,7 @@
 package xrp
 
 import (
-	"github.com/jdcloud-bds/bds/common/math"
+	"github.com/aminvici/bds/common/math"
 )
 
 type Account struct {

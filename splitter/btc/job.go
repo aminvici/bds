@@ -2,9 +2,9 @@ package btc
 
 import (
 	"fmt"
-	"github.com/jdcloud-bds/bds/common/log"
-	"github.com/jdcloud-bds/bds/service"
-	model "github.com/jdcloud-bds/bds/service/model/btc"
+	"github.com/aminvici/bds/common/log"
+	"github.com/aminvici/bds/service"
+	model "github.com/aminvici/bds/service/model/btc"
 	"strconv"
 	"time"
 )

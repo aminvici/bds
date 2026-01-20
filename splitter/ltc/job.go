@@ -2,9 +2,9 @@ package ltc
 
 import (
 	"fmt"
-	"github.com/jdcloud-bds/bds/common/log"
-	"github.com/jdcloud-bds/bds/service"
-	model "github.com/jdcloud-bds/bds/service/model/ltc"
+	"github.com/aminvici/bds/common/log"
+	"github.com/aminvici/bds/service"
+	model "github.com/aminvici/bds/service/model/ltc"
 	"strconv"
 	"time"
 )

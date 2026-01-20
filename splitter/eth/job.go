@@ -2,10 +2,10 @@ package eth
 
 import (
 	"fmt"
-	"github.com/jdcloud-bds/bds/common/cuckoofilter"
-	"github.com/jdcloud-bds/bds/common/log"
-	"github.com/jdcloud-bds/bds/service"
-	model "github.com/jdcloud-bds/bds/service/model/eth"
+	"github.com/aminvici/bds/common/cuckoofilter"
+	"github.com/aminvici/bds/common/log"
+	"github.com/aminvici/bds/service"
+	model "github.com/aminvici/bds/service/model/eth"
 	"strconv"
 	"strings"
 	"time"
