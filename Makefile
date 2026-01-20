@@ -14,6 +14,7 @@ PKGS     = $(or $(PKG),$(shell cd $(BASE) && env GOPATH=$(GOPATH) $(GO) list ./.
 TESTPKGS = $(shell env GOPATH=$(GOPATH) $(GO) list -f '{{ if or .TestGoFiles .XTestGoFiles }}{{ .ImportPath }}{{ end }}' $(PKGS))
 
 export GOPATH
+export GOBIN = $(BIN)
 
 GO      = go
 GODOC   = godoc
@@ -33,14 +34,14 @@ all: fmt | build
 build: $(BASE) ; $(info $(M) building executable ...) @ ## Build program binary
 	$Q cd $(BASE) && \
 		release=$(RELEASE).$(DATE).$(COMMITID); \
-		if [[ "$(RELEASE)" -eq "" ]] ; then \
+		if [ -z "$(RELEASE)" ] ; then \
 			release=0.$(DATE)$(TIME); \
 		fi && \
 		$(GO) install \
 		-tags release \
 		-ldflags "-X main.versionNumber=$(VERSION)-$$release -X main.buildTime=$(DATE)-$(TIME)" \
 		$(PKGS) ; \
-		cp -rdp config/*.conf $(GOPATH)/config ; \
+		cp -rdp config/*.conf $(GOPATH)/config 2>/dev/null || true ; \
 
 $(BASE): ; $(info $(M) setting GOPATH ...)
 	@mkdir -p $(dir $@)
@@ -65,11 +66,11 @@ fmt: ; $(info $(M) running gofmt ...) @ ## Run gofmt on all source files
 .PHONY: rpm
 rpm: build ; $(info $(M) building rpm ...) @ ## Building rpm packages
 	@mkdir -p $(GOPATH)/rpms
-	@mkdir -p $(RPMBUILD)/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+	@mkdir -p $(RPMBUILD)/BUILD $(RPMBUILD)/RPMS $(RPMBUILD)/SOURCES $(RPMBUILD)/SPECS $(RPMBUILD)/SRPMS
 	@ret=0 && for s in $$(ls spec); do \
 		cd $(BASE) ; \
 		release=$(RELEASE).$(DATE).$(COMMITID); \
-		if [[ "$(RELEASE)" -eq "" ]] ; then \
+		if [ -z "$(RELEASE)" ] ; then \
 			release=0.$(DATE)$(TIME); \
 		fi; \
 		name=$${s%%.*} ; \

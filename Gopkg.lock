@@ -2,262 +2,261 @@
 
 
 [[projects]]
-  name = "cloud.google.com/go"
-  packages = ["civil"]
-  revision = "457ea5c15ccf3b87db582c450e80101989da35f7"
-  version = "v0.40.0"
-
-[[projects]]
-  branch = "master"
-  name = "github.com/Chronokeeper/anyxml"
-  packages = ["."]
-  revision = "54457d8e98c60cb91f18947facfa991ce3ea2ba3"
-
-[[projects]]
-  branch = "master"
-  name = "github.com/CloudyKit/fastprinter"
-  packages = ["."]
-  revision = "74b38d55f37af5d6c05ca11147d616b613a3420e"
-
-[[projects]]
-  name = "github.com/CloudyKit/jet"
-  packages = ["."]
-  revision = "2b064536b25ab0e9c54245f9e2cc5bd4766033fe"
-  version = "v2.1.2"
-
-[[projects]]
+  digest = "1:6d8a3b164679872fa5a4c44559235f7fb109c7b5cd0f456a2159d579b76cc9ba"
   name = "github.com/DataDog/zstd"
   packages = ["."]
+  pruneopts = "UT"
   revision = "809b919c325d7887bff7bd876162af73db53e878"
   version = "v1.4.0"
 
 [[projects]]
+  digest = "1:2ec153af6a806c3d63d4299f2549bcb29d75d9703097341be309a46db3481488"
   name = "github.com/Shopify/sarama"
   packages = ["."]
+  pruneopts = "UT"
   revision = "ea9ab1c316850bee881a07bb2555ee8a685cd4b6"
   version = "v1.22.1"
 
 [[projects]]
-  branch = "master"
-  name = "github.com/agrison/go-tablib"
-  packages = ["."]
-  revision = "4930582c22eec7bfc0e5b47e0246d5048a78fe49"
-
-[[projects]]
-  branch = "master"
-  name = "github.com/agrison/mxj"
-  packages = ["."]
-  revision = "1269f8afb3b42d0e7b9cf60041e8e187727c88d6"
-
-[[projects]]
-  name = "github.com/bndr/gotabulate"
-  packages = ["."]
-  revision = "94ff52dbe671866d4f5cd3463ecdad8ec550e578"
-  version = "v1.1.2"
-
-[[projects]]
+  digest = "1:526d64d0a3ac6c24875724a9355895be56a21f89a5d3ab5ba88d91244269a7d8"
   name = "github.com/bsm/sarama-cluster"
   packages = ["."]
+  pruneopts = "UT"
   revision = "c618e605e15c0d7535f6c96ff8efbb0dba4fd66c"
   version = "v2.1.15"
 
 [[projects]]
+  digest = "1:ffe9824d294da03b391f44e1ae8281281b4afc1bdaa9588c9097785e3af10cec"
   name = "github.com/davecgh/go-spew"
   packages = ["spew"]
+  pruneopts = "UT"
   revision = "8991bc29aa16c548c550c7ff78260e27b9ab7c73"
   version = "v1.1.1"
 
 [[projects]]
-  branch = "master"
+  digest = "1:14bec9102c4b9d0cd6ead3aca688fbb32107b1af4d3366bda7af8121796facd4"
   name = "github.com/denisenkom/go-mssqldb"
   packages = [
     ".",
-    "internal/cp"
+    "internal/cp",
+    "internal/decimal",
+    "internal/querytext",
+    "msdsn",
   ]
-  revision = "eb9f6a1743f30383c8168cc520ca5db1f744d6f4"
+  pruneopts = "UT"
+  revision = "ed0f62060df11d7cf555612aff3b66bbabc374d3"
+  version = "v0.12.3"
 
 [[projects]]
+  digest = "1:1f0c7ab489b407a7f8f9ad16c25a504d28ab461517a971d341388a56156c1bd7"
   name = "github.com/eapache/go-resiliency"
   packages = ["breaker"]
+  pruneopts = "UT"
   revision = "ea41b0fad31007accc7f806884dcdf3da98b79ce"
   version = "v1.1.0"
 
 [[projects]]
   branch = "master"
+  digest = "1:79f16588b5576b1b3cd90e48d2374cc9a1a8776862d28d8fd0f23b0e15534967"
   name = "github.com/eapache/go-xerial-snappy"
   packages = ["."]
+  pruneopts = "UT"
   revision = "776d5712da21bc4762676d614db1d8a64f4238b0"
 
 [[projects]]
+  digest = "1:444b82bfe35c83bbcaf84e310fb81a1f9ece03edfed586483c869e2c046aef69"
   name = "github.com/eapache/queue"
   packages = ["."]
+  pruneopts = "UT"
   revision = "44cc805cf13205b55f69e14bcb69867d1ae92f98"
   version = "v1.1.0"
 
 [[projects]]
-  name = "github.com/fatih/structs"
-  packages = ["."]
-  revision = "4966fc68f5b7593aafa6cbbba2d65ec6e1416047"
-  version = "v1.1.0"
-
-[[projects]]
-  name = "github.com/fsnotify/fsnotify"
-  packages = ["."]
-  revision = "c2828203cd70a50dcccfb2761f8b1f8ceef9a8e9"
-  version = "v1.4.7"
-
-[[projects]]
+  digest = "1:d37c61a335d13bc49b3f90e9e13c8686e4548839b69c58549e727afb2245c454"
   name = "github.com/go-ini/ini"
   packages = ["."]
+  pruneopts = "UT"
   revision = "c85607071cf08ca1adaf48319cd1aa322e81d8c1"
   version = "v1.42.0"
 
 [[projects]]
+  digest = "1:ec6f9bf5e274c833c911923c9193867f3f18788c461f76f05f62bb1510e0ae65"
   name = "github.com/go-sql-driver/mysql"
   packages = ["."]
+  pruneopts = "UT"
   revision = "72cd26f257d44c1114970e19afddcd812016007e"
   version = "v1.4.1"
 
 [[projects]]
+  digest = "1:0f10ea3cf79a9cf229609548e09f028ba5d58faf5e78888921d4965455b0deff"
   name = "github.com/go-xorm/xorm"
   packages = ["."]
+  pruneopts = "UT"
   revision = "f3e6c3a26b8f7e70fee2751b885531c81bdfa928"
+  source = "gitea.com/xorm/xorm"
   version = "v0.7.4"
 
 [[projects]]
+  branch = "master"
+  digest = "1:bd9fb24a3a555e227ff66de5f185fdb8ead34da3f1b8e9d62e47893c7db332a9"
+  name = "github.com/golang-sql/civil"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "b832511892a9aa2766214afc9cc347c94e7088ea"
+
+[[projects]]
+  digest = "1:b95190e758d04cc6e484bf71139749512b2a024f0716d2d71c3bae2a1d03c6e6"
+  name = "github.com/golang-sql/sqlexp"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "d42ba59f5c11011b1df5abc536ee75821c22bdac"
+  version = "v0.1.0"
+
+[[projects]]
+  digest = "1:e4f5819333ac698d294fe04dbf640f84719658d5c7ce195b10060cc37292ce79"
   name = "github.com/golang/snappy"
   packages = ["."]
+  pruneopts = "UT"
   revision = "2a8bb927dd31d8daada140a5d09578521ce5c36a"
   version = "v0.0.1"
 
 [[projects]]
+  digest = "1:4bdb4a64d824c2d3f5959a43cd7522db7d705403369e6930ed072a28bd68340e"
   name = "github.com/greenplum-db/pq"
   packages = ["."]
+  pruneopts = "UT"
   revision = "bc6a3c0594130b1e34005880bc600b6d3f49fa7f"
   version = "v1.1.1"
 
 [[projects]]
-  name = "github.com/iris-contrib/go.uuid"
-  packages = ["."]
-  revision = "36e9d2ebbde5e3f13ab2e25625fd453271d6522e"
-  version = "v2.0.0"
-
-[[projects]]
-  name = "github.com/kataras/iris"
-  packages = ["core/errors"]
-  revision = "a0f29bd2f48611021667c199cff55c1e3ab46f81"
-  version = "v11.1.1"
-
-[[projects]]
+  digest = "1:bdd53b87de8185da386bae179c84d4848854c6870bacacf6a154fe63e2e750f7"
   name = "github.com/lib/pq"
   packages = [
     ".",
     "oid",
-    "scram"
+    "scram",
   ]
+  pruneopts = "UT"
   revision = "bc6a3c0594130b1e34005880bc600b6d3f49fa7f"
   version = "v1.1.1"
 
 [[projects]]
+  digest = "1:259f9b7645983a7a823318d78aa96dec68af8891f706493ac1ec04d819cb977c"
   name = "github.com/pierrec/lz4"
   packages = [
     ".",
-    "internal/xxh32"
+    "internal/xxh32",
   ]
+  pruneopts = "UT"
   revision = "d705d4371bfccdf47f10e45584e896026c83616f"
   version = "v2.2.3"
 
 [[projects]]
   branch = "master"
+  digest = "1:d38f81081a389f1466ec98192cf9115a82158854d6f01e1c23e2e7554b97db71"
   name = "github.com/rcrowley/go-metrics"
   packages = ["."]
+  pruneopts = "UT"
   revision = "3113b8401b8a98917cde58f8bbd42a1b1c03b1fd"
 
 [[projects]]
   branch = "master"
-  name = "github.com/tealeg/xlsx"
-  packages = ["."]
-  revision = "e2d23f3c43dc758fca2d02d6f0052ba3d4f80e19"
-
-[[projects]]
-  branch = "master"
+  digest = "1:f4e5276a3b356f4692107047fd2890f2fe534f4feeb6b1fd2f6dfbd87f1ccf54"
   name = "github.com/xeipuuv/gojsonpointer"
   packages = ["."]
+  pruneopts = "UT"
   revision = "4e3ac2762d5f479393488629ee9370b50873b3a6"
 
 [[projects]]
   branch = "master"
+  digest = "1:dc6a6c28ca45d38cfce9f7cb61681ee38c5b99ec1425339bfc1e1a7ba769c807"
   name = "github.com/xeipuuv/gojsonreference"
   packages = ["."]
+  pruneopts = "UT"
   revision = "bd5ef7bd5415a7ac448318e64f11a24cd21e594b"
 
 [[projects]]
+  digest = "1:1c898ea6c30c16e8d55fdb6fe44c4bee5f9b7d68aa260cfdfc3024491dcc7bea"
   name = "github.com/xeipuuv/gojsonschema"
   packages = ["."]
+  pruneopts = "UT"
   revision = "f971f3cd73b2899de6923801c147f075263e0c50"
   version = "v1.1.0"
 
 [[projects]]
   branch = "master"
+  digest = "1:100a36e16f77aaad7c9144ab26bcefb92c5b6ebed5b137f935fdc11f541fa5b8"
   name = "golang.org/x/crypto"
   packages = ["md4"]
+  pruneopts = "UT"
   revision = "5c40567a22f818bd14a1ea7245dad9f8ef0691aa"
 
 [[projects]]
   branch = "master"
+  digest = "1:3e0062766e6b0bcfe1ba1ed1d3f08a8e1e99cd5831426e2596dc9537d28f2adb"
   name = "golang.org/x/net"
   packages = [
     "internal/socks",
-    "proxy"
+    "proxy",
   ]
+  pruneopts = "UT"
   revision = "d28f0bde5980168871434b95cfc858db9f2a7a99"
 
 [[projects]]
-  branch = "master"
+  digest = "1:a613af86e761cbec853cf1bbd40ad8b12b70a6a5016e96eac673fb6d0405625f"
   name = "golang.org/x/sys"
   packages = [
-    "unix",
     "windows",
     "windows/registry",
     "windows/svc",
     "windows/svc/eventlog",
-    "windows/svc/mgr"
+    "windows/svc/mgr",
   ]
-  revision = "5ed2794edfdc1c54dfb61d619c5944285f35d444"
+  pruneopts = "UT"
+  revision = "2f442297556c884f9b52fc6ef7280083f4d65023"
+  version = "v0.40.0"
 
 [[projects]]
+  digest = "1:c25289f43ac4a68d88b02245742347c94f1e108c534dda442188015ff80669b3"
   name = "google.golang.org/appengine"
   packages = ["cloudsql"]
+  pruneopts = "UT"
   revision = "b2f4a3cf3c67576a2ee09e1fe62656a5086ce880"
   version = "v1.6.1"
 
 [[projects]]
-  name = "gopkg.in/flosch/pongo2.v3"
-  packages = ["."]
-  revision = "5e81b817a0c48c1c57cdf1a9056cf76bdee02ca9"
-  version = "v3.0"
-
-[[projects]]
-  name = "gopkg.in/yaml.v2"
-  packages = ["."]
-  revision = "51d6538a90f86fe93ac480b35f37b2be17fef232"
-  version = "v2.2.2"
-
-[[projects]]
+  digest = "1:69760bb625770798aa43843e5a493097a9f864646697f5ee29015cc0565524a6"
   name = "xorm.io/builder"
   packages = ["."]
+  pruneopts = "UT"
   revision = "5175e98d9e97da33b5b8234760b151d867cb2620"
   version = "v0.3.5"
 
 [[projects]]
+  digest = "1:3a0128b50d38343b108e97b5b7d86d384df2cbd06ec7db69cb37e62d1e349009"
   name = "xorm.io/core"
   packages = ["."]
+  pruneopts = "UT"
   revision = "a31f53637037b3461649b8a9a03e13b26d31f12d"
   version = "v0.6.3"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "6b3e6c984465b7f0ac58c97e3a5e4b891031b9a148776fb2ed456bade7689c30"
+  input-imports = [
+    "github.com/Shopify/sarama",
+    "github.com/bsm/sarama-cluster",
+    "github.com/denisenkom/go-mssqldb",
+    "github.com/go-ini/ini",
+    "github.com/go-sql-driver/mysql",
+    "github.com/go-xorm/xorm",
+    "github.com/greenplum-db/pq",
+    "github.com/xeipuuv/gojsonschema",
+    "golang.org/x/sys/windows/registry",
+    "golang.org/x/sys/windows/svc",
+    "golang.org/x/sys/windows/svc/eventlog",
+    "golang.org/x/sys/windows/svc/mgr",
+    "xorm.io/core",
+  ]
   solver-name = "gps-cdcl"
   solver-version = 1

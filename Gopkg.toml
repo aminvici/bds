@@ -26,8 +26,8 @@
 
 
 [[constraint]]
-  branch = "master"
   name = "github.com/Chronokeeper/anyxml"
+  version = "0.0.0"
 
 [[constraint]]
   name = "github.com/CloudyKit/jet"
@@ -38,16 +38,16 @@
   version = "1.22.1"
 
 [[constraint]]
-  branch = "master"
   name = "github.com/agrison/go-tablib"
+  version = "1.0.0"
 
 [[constraint]]
   name = "github.com/bsm/sarama-cluster"
   version = "2.1.15"
 
 [[constraint]]
-  branch = "master"
   name = "github.com/denisenkom/go-mssqldb"
+  version = "0.12.3"
 
 [[constraint]]
   name = "github.com/fsnotify/fsnotify"
@@ -66,16 +66,12 @@
   version = "1.1.1"
 
 [[constraint]]
-  name = "gopkg.in/kataras/iris.v11"
-  version = "11.1.1"
-
-[[constraint]]
   name = "github.com/xeipuuv/gojsonschema"
   version = "1.1.0"
 
 [[constraint]]
-  branch = "master"
   name = "golang.org/x/sys"
+  version = "0.40.0"
 
 [[constraint]]
   name = "gopkg.in/flosch/pongo2.v3"
@@ -88,3 +84,4 @@
 [[constraint]]
   name = "github.com/go-xorm/xorm"
   version = "0.7.4"
+  source = "gitea.com/xorm/xorm"

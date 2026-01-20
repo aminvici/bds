@@ -1,0 +1,8 @@
+#!/bin/sh
+# alien added permissions fixup code
+chown 'nobody:nobody' '/etc/bds-splitter/splitter.conf'
+chown 'nobody:nobody' '/usr/bin/bds-splitter'
+chown 'nobody:nobody' '/var/lock/bds-splitter'
+chown 'nobody:nobody' '/var/log/bds-splitter'
+chown 'nobody:nobody' '/var/run/bds-splitter'
+
