@@ -1,20 +1,22 @@
 package kafka
 
 import (
-	"github.com/Shopify/sarama"
-	"github.com/bsm/sarama-cluster"
+	"context"
 	"github.com/aminvici/bds/common/log"
+	"github.com/segmentio/kafka-go"
 	"strings"
+	"time"
 )
 
 type ConsumerGroup struct {
-	clusterConfig  *cluster.Config
+	reader         *kafka.Reader
 	brokerList     []string
 	groupID        string
-	consumer       *cluster.Consumer
 	messageChannel chan *Message
 	errorChannel   chan *MessageError
 	stopChannel    chan bool
+	ctx            context.Context
+	cancel         context.CancelFunc
 }
 
 type ConsumerGroupConfig struct {
@@ -27,15 +29,12 @@ type ConsumerGroupConfig struct {
 
 func NewConsumerGroup(cfg *ConsumerGroupConfig) (*ConsumerGroup, error) {
 	consumerGroup := new(ConsumerGroup)
-	consumerGroup.clusterConfig = cluster.NewConfig()
-	consumerGroup.clusterConfig.Consumer.Return.Errors = cfg.ReturnErrors
-	consumerGroup.clusterConfig.ClientID = cfg.ClientID
-
 	consumerGroup.brokerList = strings.Split(cfg.BrokerList, ",")
 	consumerGroup.groupID = cfg.GroupID
 	consumerGroup.messageChannel = make(chan *Message, cfg.BufferSize)
 	consumerGroup.errorChannel = make(chan *MessageError, cfg.BufferSize)
 	consumerGroup.stopChannel = make(chan bool)
+	consumerGroup.ctx, consumerGroup.cancel = context.WithCancel(context.Background())
 
 	return consumerGroup, nil
 }
@@ -50,68 +49,64 @@ func (c *ConsumerGroup) ErrorChannel() <-chan *MessageError {
 
 func (c *ConsumerGroup) Start(topic string) error {
 	log.Debug("kafka: topic %s", topic)
-	var err error
-	c.consumer, err = cluster.NewConsumer(c.brokerList, c.groupID, []string{topic}, c.clusterConfig)
-	if err != nil {
-		return err
-	}
+
+	c.reader = kafka.NewReader(kafka.ReaderConfig{
+		Brokers:        c.brokerList,
+		GroupID:        c.groupID,
+		Topic:          topic,
+		StartOffset:    kafka.FirstOffset,
+		MinBytes:       10e3, // 10KB
+		MaxBytes:       10e6, // 10MB
+		CommitInterval: time.Second,
+		SessionTimeout: 6 * time.Second,
+	})
 
 	go c.receiveMessages()
-	if c.clusterConfig.Consumer.Return.Errors {
-		go c.receiveErrors()
-	}
 	return nil
 }
 
 func (c *ConsumerGroup) Stop() {
-	_ = c.consumer.Close()
-	c.stopChannel <- true
-	if c.clusterConfig.Consumer.Return.Errors {
-		c.stopChannel <- true
+	c.cancel()
+	if c.reader != nil {
+		_ = c.reader.Close()
 	}
+	close(c.stopChannel)
 }
 
 func (c *ConsumerGroup) MarkOffset(msg *Message) {
-	c.consumer.MarkOffset(
-		&sarama.ConsumerMessage{
-			Topic:     msg.Topic,
-			Partition: msg.Partition,
-			Offset:    msg.Offset,
-		}, "")
+	// segmentio/kafka-go handles offset management automatically
+	// when CommitInterval is set in ReaderConfig
+	log.Debug("kafka: marking offset for topic %s partition %d offset %d",
+		msg.Topic, msg.Partition, msg.Offset)
 }
 
 func (c *ConsumerGroup) receiveMessages() {
 	for {
 		select {
-		case msg := <-c.consumer.Messages():
+		case <-c.ctx.Done():
+			return
+		default:
+			msg, err := c.reader.ReadMessage(c.ctx)
+			if err != nil {
+				if err == context.Canceled {
+					return
+				}
+				log.Debug("kafka: receive error %v", err)
+				c.errorChannel <- &MessageError{
+					Error: err,
+					Topic: msg.Topic,
+				}
+				continue
+			}
+
 			log.Debug("kafka: topic %s receive data on partition %d offset %d length %d",
 				msg.Topic, msg.Partition, msg.Offset, len(msg.Value))
 			c.messageChannel <- &Message{
 				Topic:     msg.Topic,
-				Partition: msg.Partition,
+				Partition: int32(msg.Partition),
 				Offset:    msg.Offset,
 				Key:       msg.Key,
 				Data:      msg.Value,
-			}
-		case stop := <-c.stopChannel:
-			if stop {
-				return
-			}
-		}
-	}
-}
-
-func (c *ConsumerGroup) receiveErrors() {
-	for {
-		select {
-		case msg := <-c.consumer.Errors():
-			log.Debug("kafka: receive error %s", msg.Error())
-			c.errorChannel <- &MessageError{
-				Error: msg,
-			}
-		case stop := <-c.stopChannel:
-			if stop {
-				return
 			}
 		}
 	}

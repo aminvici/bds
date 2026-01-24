@@ -1,14 +1,14 @@
 package kafka
 
 import (
-	"github.com/Shopify/sarama"
+	"fmt"
+	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"strings"
 	"time"
 )
 
 type Producer struct {
-	kafkaConfig    *sarama.Config
-	producers      []sarama.AsyncProducer
+	producer       *kafka.Producer
 	messageChannel chan *Message
 	errorChannel   chan *MessageError
 	stopChannel    chan bool
@@ -44,32 +44,22 @@ type MessageError struct {
 
 func NewProducer(cfg *ProducerConfig) (*Producer, error) {
 	producer := new(Producer)
-	producer.producers = make([]sarama.AsyncProducer, 0)
 	producer.messageChannel = make(chan *Message, cfg.BufferSize)
 	producer.errorChannel = make(chan *MessageError, cfg.BufferSize)
-	producerNum := 1
-	if cfg.ProducerNum > 1 {
-		producerNum = cfg.ProducerNum
+	producer.stopChannel = make(chan bool, 1)
+
+	configMap := kafka.ConfigMap{
+		"bootstrap.servers": cfg.BrokerList,
+		"acks": "local",
+		"linger.ms": cfg.FlushFrequency,
 	}
 
-	producer.stopChannel = make(chan bool, producerNum)
-	for i := 0; i < producerNum; i++ {
-		brokers := cfg.BrokerList
-		producer.kafkaConfig = sarama.NewConfig()
-		producer.kafkaConfig.Producer.RequiredAcks = sarama.WaitForLocal
-		producer.kafkaConfig.Producer.Return.Errors = cfg.ReturnErrors
-		producer.kafkaConfig.Producer.Return.Successes = false
-		producer.kafkaConfig.Producer.Flush.Messages = cfg.FlushMessages
-		producer.kafkaConfig.Producer.Flush.Frequency = time.Millisecond * time.Duration(cfg.FlushFrequency)
-		producer.kafkaConfig.Producer.Flush.MaxMessages = cfg.FlushMaxMessages
-		producer.kafkaConfig.Producer.Timeout = time.Millisecond * time.Duration(cfg.Timeout)
-		p, err := sarama.NewAsyncProducer(strings.Split(brokers, ","), producer.kafkaConfig)
-		if err != nil {
-			return nil, err
-		}
-		producer.producers = append(producer.producers, p)
+	p, err := kafka.NewProducer(&configMap)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create producer: %v", err)
 	}
 
+	producer.producer = p
 	return producer, nil
 }
 
@@ -82,28 +72,39 @@ func (p *Producer) ErrorChannel() <-chan *MessageError {
 }
 
 func (p *Producer) Start() {
-	for _, producer := range p.producers {
-		go p.receiveMessages(producer)
-		if p.kafkaConfig.Producer.Return.Errors {
-			go p.receiveErrors(producer)
-		}
-	}
+	go p.receiveMessages()
+	go p.receiveDeliveryReports()
 }
 
 func (p *Producer) Stop() {
-	for i := 0; i < len(p.producers); i++ {
-		p.stopChannel <- true
+	p.stopChannel <- true
+	// Flush any remaining messages
+	remaining := p.producer.Flush(10000)
+	if remaining > 0 {
+		fmt.Printf("Warning: %d messages in queue were not delivered\n", remaining)
 	}
+	p.producer.Close()
 }
 
-func (p *Producer) receiveMessages(producer sarama.AsyncProducer) {
+func (p *Producer) receiveMessages() {
 	for {
 		select {
 		case msg := <-p.messageChannel:
-			producer.Input() <- &sarama.ProducerMessage{
-				Topic: msg.Topic,
-				Value: sarama.ByteEncoder(msg.Data),
+			partition := kafka.PartitionAny
+			if msg.Partition != 0 {
+				partition = msg.Partition
 			}
+			
+			kmsg := &kafka.Message{
+				TopicPartition: kafka.TopicPartition{
+					Topic:     &msg.Topic,
+					Partition: partition,
+				},
+				Key:   msg.Key,
+				Value: msg.Data,
+			}
+			
+			p.producer.ProduceChannel() <- kmsg
 		case stop := <-p.stopChannel:
 			if stop {
 				return
@@ -112,17 +113,22 @@ func (p *Producer) receiveMessages(producer sarama.AsyncProducer) {
 	}
 }
 
-func (p *Producer) receiveErrors(producer sarama.AsyncProducer) {
-	for {
-		select {
-		case msg := <-producer.Errors():
+func (p *Producer) receiveDeliveryReports() {
+	for e := range p.producer.Events() {
+		switch ev := e.(type) {
+		case *kafka.Message:
+			if ev.TopicPartition.Error != nil {
+				p.errorChannel <- &MessageError{
+					Error:     ev.TopicPartition.Error,
+					Topic:     *ev.TopicPartition.Topic,
+					Timestamp: ev.Timestamp,
+					Partition: ev.TopicPartition.Partition,
+					Offset:    int64(ev.TopicPartition.Offset),
+				}
+			}
+		case kafka.Error:
 			p.errorChannel <- &MessageError{
-				msg.Err,
-				msg.Msg.Topic,
-				msg.Msg.Timestamp,
-				msg.Msg.Partition,
-				msg.Msg.Offset,
-				msg.Msg.Metadata,
+				Error: ev,
 			}
 		}
 	}

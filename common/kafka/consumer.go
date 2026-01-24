@@ -1,18 +1,23 @@
 package kafka
 
 import (
-	"github.com/Shopify/sarama"
+	"context"
+	"fmt"
 	"github.com/aminvici/bds/common/log"
+	"github.com/segmentio/kafka-go"
 	"strings"
+	"time"
 )
 
 type Consumer struct {
-	kafkaConfig    *sarama.Config
-	consumer       sarama.Consumer
+	reader         *kafka.Reader
 	messageChannel chan *Message
 	errorChannel   chan *MessageError
 	stopChannel    chan bool
+	ctx            context.Context
+	cancel         context.CancelFunc
 	partitionNum   int
+	brokers        []string
 }
 
 type ConsumerConfig struct {
@@ -29,19 +34,12 @@ type ConsumerConfig struct {
 
 func NewConsumer(cfg *ConsumerConfig) (*Consumer, error) {
 	consumer := new(Consumer)
-	brokers := cfg.BrokerList
-	consumer.kafkaConfig = sarama.NewConfig()
-	consumer.kafkaConfig.Consumer.Return.Errors = cfg.ReturnErrors
-	consumer.kafkaConfig.ClientID = cfg.ClientID
-	c, err := sarama.NewConsumer(strings.Split(brokers, ","), consumer.kafkaConfig)
-	if err != nil {
-		return nil, err
-	}
+	consumer.brokers = strings.Split(cfg.BrokerList, ",")
 
 	consumer.messageChannel = make(chan *Message, cfg.BufferSize)
 	consumer.errorChannel = make(chan *MessageError, cfg.BufferSize)
 	consumer.stopChannel = make(chan bool)
-	consumer.consumer = c
+	consumer.ctx, consumer.cancel = context.WithCancel(context.Background())
 
 	return consumer, nil
 }
@@ -55,65 +53,75 @@ func (c *Consumer) ErrorChannel() <-chan *MessageError {
 }
 
 func (c *Consumer) Start(topic string) error {
-	partitions, err := c.consumer.Partitions(topic)
-	log.Debug("kafka: topic %s partitions %v", topic, partitions)
+	// Get broker list from context or configuration
+	// We'll need to store it in the struct
+	cfg := c.getReaderConfig(topic)
+	c.reader = kafka.NewReader(cfg)
+
+	// Get partition count for the topic
+	conn, err := kafka.Dial("tcp", cfg.Brokers[0])
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to dial broker: %v", err)
 	}
-	for _, p := range partitions {
-		pc, err := c.consumer.ConsumePartition(topic, p, sarama.OffsetNewest)
-		if err != nil {
-			return err
-		}
-		go c.receiveMessages(pc)
-		if c.kafkaConfig.Consumer.Return.Errors {
-			go c.receiveErrors(pc)
-		}
+	defer conn.Close()
+
+	partitions, err := conn.ReadPartitions(topic)
+	if err != nil {
+		return fmt.Errorf("failed to read partitions: %v", err)
 	}
+
 	c.partitionNum = len(partitions)
+	log.Debug("kafka: topic %s partitions %d", topic, c.partitionNum)
+
+	go c.receiveMessages()
 	return nil
 }
 
-func (c *Consumer) Stop() {
-	_ = c.consumer.Close()
-	for i := 0; i < c.partitionNum; i++ {
-		c.stopChannel <- true
-		if c.kafkaConfig.Consumer.Return.Errors {
-			c.stopChannel <- true
-		}
+func (c *Consumer) getReaderConfig(topic string) kafka.ReaderConfig {
+	return kafka.ReaderConfig{
+		Brokers:        c.brokers,
+		Topic:          topic,
+		StartOffset:    kafka.LastOffset,
+		MinBytes:       10e3, // 10KB
+		MaxBytes:       10e6, // 10MB
+		CommitInterval: time.Second,
 	}
 }
 
-func (c *Consumer) receiveMessages(consumer sarama.PartitionConsumer) {
+func (c *Consumer) Stop() {
+	c.cancel()
+	if c.reader != nil {
+		_ = c.reader.Close()
+	}
+	close(c.stopChannel)
+}
+
+func (c *Consumer) receiveMessages() {
 	for {
 		select {
-		case msg := <-consumer.Messages():
+		case <-c.ctx.Done():
+			return
+		default:
+			msg, err := c.reader.ReadMessage(c.ctx)
+			if err != nil {
+				if err == context.Canceled {
+					return
+				}
+				log.Debug("kafka: receive error %v", err)
+				c.errorChannel <- &MessageError{
+					Error: err,
+					Topic: msg.Topic,
+				}
+				continue
+			}
+
 			log.Debug("kafka: topic %s receive data length %d", msg.Topic, len(msg.Value))
 			c.messageChannel <- &Message{
-				Topic: msg.Topic,
-				Data:  msg.Value,
-			}
-		case stop := <-c.stopChannel:
-			if stop {
-				return
-			}
-		}
-	}
-}
-
-func (c *Consumer) receiveErrors(consumer sarama.PartitionConsumer) {
-	for {
-		select {
-		case msg := <-consumer.Errors():
-			log.Debug("kafka: topic %s partition %d receive error %s", msg.Topic, msg.Partition, msg.Err.Error())
-			c.errorChannel <- &MessageError{
-				Error:     msg.Err,
 				Topic:     msg.Topic,
-				Partition: msg.Partition,
-			}
-		case stop := <-c.stopChannel:
-			if stop {
-				return
+				Partition: int32(msg.Partition),
+				Offset:    msg.Offset,
+				Key:       msg.Key,
+				Data:      msg.Value,
 			}
 		}
 	}

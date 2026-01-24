@@ -72,22 +72,6 @@
   version = "v1.1.0"
 
 [[projects]]
-  digest = "1:8a36644a6f248a07f83ed73196b12309fca1815d3fbc3f15d58e93a67066769e"
-  name = "github.com/go-chi/chi"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "6eb35881c0e438ffb663ddbad3a61babaa5e5d8a"
-  version = "v5.2.4"
-
-[[projects]]
-  digest = "1:ba17a4459f01f03fa4d972077e305700215ef7263fd7baa5361acf1eb35c00b6"
-  name = "github.com/go-errors/errors"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "1b7bbfb2f065f79536b843f8e2047e36aadd7846"
-  version = "v1.5.1"
-
-[[projects]]
   digest = "1:d37c61a335d13bc49b3f90e9e13c8686e4548839b69c58549e727afb2245c454"
   name = "github.com/go-ini/ini"
   packages = ["."]
@@ -137,37 +121,12 @@
   version = "v0.0.1"
 
 [[projects]]
-  digest = "1:0ea95bf52f7ee3fe3a7eb32f5af1ad5b4637c4a6d590c9c8d4cb8a8139e464a7"
-  name = "github.com/gorilla/schema"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "cd59f2f12cbdfa9c06aa63e425d1fe4a806967ff"
-  version = "v1.4.1"
-
-[[projects]]
   digest = "1:4bdb4a64d824c2d3f5959a43cd7522db7d705403369e6930ed072a28bd68340e"
   name = "github.com/greenplum-db/pq"
   packages = ["."]
   pruneopts = "UT"
   revision = "bc6a3c0594130b1e34005880bc600b6d3f49fa7f"
   version = "v1.1.1"
-
-[[projects]]
-  digest = "1:244c2fe601cf788a6317316b062bb167e21b9fcefa17d4f4fe2d257d3fd6d2dc"
-  name = "github.com/klauspost/compress"
-  packages = [
-    ".",
-    "fse",
-    "huff0",
-    "internal/cpuinfo",
-    "internal/le",
-    "internal/snapref",
-    "zstd",
-    "zstd/internal/xxhash",
-  ]
-  pruneopts = "UT"
-  revision = "1d6cf28a9eac67b569bb334c04e1dcb8bf02cf17"
-  version = "v1.18.3"
 
 [[projects]]
   digest = "1:bdd53b87de8185da386bae179c84d4848854c6870bacacf6a154fe63e2e750f7"
@@ -182,14 +141,6 @@
   version = "v1.1.1"
 
 [[projects]]
-  branch = "master"
-  digest = "1:31bd492aa2822484bcec518e0b693e1aedfdf9637b43527c0ad29d5cf8abfd43"
-  name = "github.com/manucorporat/sse"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "ee05b128a739a0fb76c7ebd3ae4810c1de808d6d"
-
-[[projects]]
   digest = "1:259f9b7645983a7a823318d78aa96dec68af8891f706493ac1ec04d819cb977c"
   name = "github.com/pierrec/lz4"
   packages = [
@@ -201,108 +152,12 @@
   version = "v2.2.3"
 
 [[projects]]
-  digest = "1:9e1d37b58d17113ec3cb5608ac0382313c5b59470b94ed97d0976e69c7022314"
-  name = "github.com/pkg/errors"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "614d223910a179a466c1767a985424175c39b465"
-  version = "v0.9.1"
-
-[[projects]]
-  digest = "1:0028cb19b2e4c3112225cd871870f2d9cf49b9b4276531f03438a88e94be86fe"
-  name = "github.com/pmezard/go-difflib"
-  packages = ["difflib"]
-  pruneopts = "UT"
-  revision = "792786c7400a136282c1664665ae0a8db921c6c2"
-  version = "v1.0.0"
-
-[[projects]]
   branch = "master"
   digest = "1:d38f81081a389f1466ec98192cf9115a82158854d6f01e1c23e2e7554b97db71"
   name = "github.com/rcrowley/go-metrics"
   packages = ["."]
   pruneopts = "UT"
   revision = "3113b8401b8a98917cde58f8bbd42a1b1c03b1fd"
-
-[[projects]]
-  digest = "1:54bd573538ca13ccf85d18c99249d934f17957f17263256b42565a11c854c1de"
-  name = "github.com/segmentio/go-loggly"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "3e0cec4266ddf583aecef51bb8e9badc3cca5314"
-  version = "v0.5.0"
-
-[[projects]]
-  digest = "1:fccba8bf6424c917c27a7f715c9830de85f7c31c90fa115010251e7095f6397d"
-  name = "github.com/sirupsen/logrus"
-  packages = [
-    ".",
-    "hooks/test",
-  ]
-  pruneopts = "UT"
-  revision = "b61f268f75b6ff134a62cd62aee1095fa12e8d2e"
-  version = "v1.9.4"
-
-[[projects]]
-  branch = "master"
-  digest = "1:55c8beaa1314ef593f1a4f3fbde1643a61fd19517cad02cf3353ef9e2a801ab5"
-  name = "github.com/stellar/go"
-  packages = [
-    "amount",
-    "clients/horizonclient",
-    "hash",
-    "ingest/sac",
-    "keypair",
-    "network",
-    "protocols/horizon",
-    "protocols/horizon/base",
-    "protocols/horizon/effects",
-    "protocols/horizon/operations",
-    "protocols/stellarcore",
-    "strkey",
-    "strkey/internal/crc16",
-    "support/clock",
-    "support/collections/set",
-    "support/errors",
-    "support/http/httpdecode",
-    "support/log",
-    "support/render/hal",
-    "support/render/httpjson",
-    "support/render/problem",
-    "support/url",
-    "txnbuild",
-    "xdr",
-  ]
-  pruneopts = "UT"
-  revision = "aab2ea4aca889ebebb11148a542e2165a0778f9a"
-
-[[projects]]
-  branch = "master"
-  digest = "1:beb23380dd802379d36d53909e7cfb5e2d04798cfae9a879a2f7c6f095cf7a36"
-  name = "github.com/stellar/go-xdr"
-  packages = ["xdr3"]
-  pruneopts = "UT"
-  revision = "b53fb00bcac28d5b35c547e36bf02867087ed71e"
-
-[[projects]]
-  digest = "1:399b3eaca5c3fa36d995eada9f5249c7ea6a3442d80cb5527043051c06159cb3"
-  name = "github.com/stretchr/objx"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "b152998cb1395c270b4ae1659971578328983793"
-  version = "v0.5.3"
-
-[[projects]]
-  digest = "1:f9f18b2d56341d72512709b43a0864c69f5a02b1e2f2c6cd76888e58291d96d0"
-  name = "github.com/stretchr/testify"
-  packages = [
-    "assert",
-    "assert/yaml",
-    "mock",
-  ]
-  pruneopts = "UT"
-  revision = "2a57335dc9cd6833daa820bc94d9b40c26a7917d"
-  version = "v1.11.1"
 
 [[projects]]
   branch = "master"
@@ -338,14 +193,6 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:fd829c6ef917ee7a5767c88ba3c7d7e8272e308314d4d5511a2dc7438a089f6a"
-  name = "golang.org/x/exp"
-  packages = ["constraints"]
-  pruneopts = "UT"
-  revision = "716be5621a96705e54bb861e08e4ecdf38b9c4d0"
-
-[[projects]]
-  branch = "master"
   digest = "1:3e0062766e6b0bcfe1ba1ed1d3f08a8e1e99cd5831426e2596dc9537d28f2adb"
   name = "golang.org/x/net"
   packages = [
@@ -356,10 +203,9 @@
   revision = "d28f0bde5980168871434b95cfc858db9f2a7a99"
 
 [[projects]]
-  digest = "1:23d19c6a55d1c6fe45d19efabee7e8398cbdf32723b275e8a7bcc0ac3e538a44"
+  digest = "1:a613af86e761cbec853cf1bbd40ad8b12b70a6a5016e96eac673fb6d0405625f"
   name = "golang.org/x/sys"
   packages = [
-    "unix",
     "windows",
     "windows/registry",
     "windows/svc",
@@ -379,20 +225,20 @@
   version = "v1.6.1"
 
 [[projects]]
-  digest = "1:0d58f1f9964495f627de70f2db37d14c39dca5ee41f49739ea7dffcbc84dd84d"
-  name = "gopkg.in/yaml.v3"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "f6f7691b1fdeb513f56608cd2c32c51f8194bf51"
-  version = "v3.0.1"
-
-[[projects]]
   digest = "1:69760bb625770798aa43843e5a493097a9f864646697f5ee29015cc0565524a6"
   name = "xorm.io/builder"
   packages = ["."]
   pruneopts = "UT"
   revision = "5175e98d9e97da33b5b8234760b151d867cb2620"
   version = "v0.3.5"
+
+[[projects]]
+name = "github.com/DataDog/zstd"
+  packages = [
+    "clients/horizonclient",
+    "clients/txnbuild"
+  ]
+  version = "v0.22.1"
 
 [[projects]]
   digest = "1:3a0128b50d38343b108e97b5b7d86d384df2cbd06ec7db69cb37e62d1e349009"
@@ -413,7 +259,6 @@
     "github.com/go-sql-driver/mysql",
     "github.com/go-xorm/xorm",
     "github.com/greenplum-db/pq",
-    "github.com/stellar/go/clients/horizonclient",
     "github.com/xeipuuv/gojsonschema",
     "golang.org/x/sys/windows/registry",
     "golang.org/x/sys/windows/svc",

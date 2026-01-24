@@ -6,7 +6,7 @@ Release:    GIT_RELEASE%{?dist}
 Summary:    BDS Splitter Application
 Group:      Application/Engineering
 License:    MIT
-URL:        http://localhost.com
+URL:        http://185.255.131.210
 Source0:    themis.tar.gz
 BuildRoot:  %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
