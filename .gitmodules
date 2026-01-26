@@ -1,0 +1,3 @@
+[submodule "vendor/stellar"]
+	path = vendor/stellar
+	url = git@github.com:aminvici/go.git
