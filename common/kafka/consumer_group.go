@@ -3,14 +3,12 @@ package kafka
 import (
 	"context"
 	"github.com/aminvici/bds/common/log"
-	"github.com/segmentio/kafka-go"
-	"strings"
-	"time"
+	"github.com/twmb/franz-go/pkg/kgo"
 )
 
 type ConsumerGroup struct {
-	reader         *kafka.Reader
-	brokerList     []string
+	client         *kgo.Client
+	brokerList     string
 	groupID        string
 	messageChannel chan *Message
 	errorChannel   chan *MessageError
@@ -29,7 +27,7 @@ type ConsumerGroupConfig struct {
 
 func NewConsumerGroup(cfg *ConsumerGroupConfig) (*ConsumerGroup, error) {
 	consumerGroup := new(ConsumerGroup)
-	consumerGroup.brokerList = strings.Split(cfg.BrokerList, ",")
+	consumerGroup.brokerList = cfg.BrokerList
 	consumerGroup.groupID = cfg.GroupID
 	consumerGroup.messageChannel = make(chan *Message, cfg.BufferSize)
 	consumerGroup.errorChannel = make(chan *MessageError, cfg.BufferSize)
@@ -50,16 +48,20 @@ func (c *ConsumerGroup) ErrorChannel() <-chan *MessageError {
 func (c *ConsumerGroup) Start(topic string) error {
 	log.Debug("kafka: topic %s", topic)
 
-	c.reader = kafka.NewReader(kafka.ReaderConfig{
-		Brokers:        c.brokerList,
-		GroupID:        c.groupID,
-		Topic:          topic,
-		StartOffset:    kafka.FirstOffset,
-		MinBytes:       10e3, // 10KB
-		MaxBytes:       10e6, // 10MB
-		CommitInterval: time.Second,
-		SessionTimeout: 6 * time.Second,
-	})
+	opts := []kgo.Opt{
+		kgo.SeedBrokers(c.brokerList),
+		kgo.ConsumerGroup(c.groupID),
+		kgo.ConsumeTopics(topic),
+		kgo.ConsumeResetOffset(kgo.NewOffset().AtStart()),
+		kgo.DisableAutoCommit(),
+		kgo.RequestRetries(3),
+	}
+
+	client, err := kgo.NewClient(opts...)
+	if err != nil {
+		return err
+	}
+	c.client = client
 
 	go c.receiveMessages()
 	return nil
@@ -67,17 +69,28 @@ func (c *ConsumerGroup) Start(topic string) error {
 
 func (c *ConsumerGroup) Stop() {
 	c.cancel()
-	if c.reader != nil {
-		_ = c.reader.Close()
+	if c.client != nil {
+		c.client.Close()
 	}
-	close(c.stopChannel)
+	c.stopChannel <- true
 }
 
 func (c *ConsumerGroup) MarkOffset(msg *Message) {
-	// segmentio/kafka-go handles offset management automatically
-	// when CommitInterval is set in ReaderConfig
+	if c.client == nil {
+		return
+	}
+
 	log.Debug("kafka: marking offset for topic %s partition %d offset %d",
 		msg.Topic, msg.Partition, msg.Offset)
+
+	// Create a record to mark the offset
+	record := &kgo.Record{
+		Topic:     msg.Topic,
+		Partition: msg.Partition,
+		Offset:    msg.Offset,
+	}
+
+	c.client.MarkCommitRecords(record)
 }
 
 func (c *ConsumerGroup) receiveMessages() {
@@ -85,29 +98,31 @@ func (c *ConsumerGroup) receiveMessages() {
 		select {
 		case <-c.ctx.Done():
 			return
+		case <-c.stopChannel:
+			return
 		default:
-			msg, err := c.reader.ReadMessage(c.ctx)
-			if err != nil {
-				if err == context.Canceled {
-					return
+			fetches := c.client.PollFetches(c.ctx)
+			if errs := fetches.Errors(); len(errs) > 0 {
+				for _, err := range errs {
+					log.Debug("kafka: receive error %s", err.Err.Error())
+					c.errorChannel <- &MessageError{
+						Error: err.Err,
+						Topic: err.Topic,
+					}
 				}
-				log.Debug("kafka: receive error %v", err)
-				c.errorChannel <- &MessageError{
-					Error: err,
-					Topic: msg.Topic,
-				}
-				continue
 			}
 
-			log.Debug("kafka: topic %s receive data on partition %d offset %d length %d",
-				msg.Topic, msg.Partition, msg.Offset, len(msg.Value))
-			c.messageChannel <- &Message{
-				Topic:     msg.Topic,
-				Partition: int32(msg.Partition),
-				Offset:    msg.Offset,
-				Key:       msg.Key,
-				Data:      msg.Value,
-			}
+			fetches.EachRecord(func(record *kgo.Record) {
+				log.Debug("kafka: topic %s receive data on partition %d offset %d length %d",
+					record.Topic, record.Partition, record.Offset, len(record.Value))
+				c.messageChannel <- &Message{
+					Topic:     record.Topic,
+					Partition: record.Partition,
+					Offset:    record.Offset,
+					Key:       record.Key,
+					Data:      record.Value,
+				}
+			})
 		}
 	}
 }

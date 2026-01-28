@@ -1,16 +1,18 @@
 package kafka
 
 import (
-	"fmt"
-	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
+	"context"
+	"github.com/twmb/franz-go/pkg/kgo"
 	"time"
 )
 
 type Producer struct {
-	producer       *kafka.Producer
+	clients        []*kgo.Client
 	messageChannel chan *Message
 	errorChannel   chan *MessageError
 	stopChannel    chan bool
+	ctx            context.Context
+	cancel         context.CancelFunc
 }
 
 type ProducerConfig struct {
@@ -43,22 +45,34 @@ type MessageError struct {
 
 func NewProducer(cfg *ProducerConfig) (*Producer, error) {
 	producer := new(Producer)
+	producer.clients = make([]*kgo.Client, 0)
 	producer.messageChannel = make(chan *Message, cfg.BufferSize)
 	producer.errorChannel = make(chan *MessageError, cfg.BufferSize)
-	producer.stopChannel = make(chan bool, 1)
-
-	configMap := kafka.ConfigMap{
-		"bootstrap.servers": cfg.BrokerList,
-		"acks": "local",
-		"linger.ms": cfg.FlushFrequency,
+	producerNum := 1
+	if cfg.ProducerNum > 1 {
+		producerNum = cfg.ProducerNum
 	}
 
-	p, err := kafka.NewProducer(&configMap)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create producer: %v", err)
+	producer.stopChannel = make(chan bool, producerNum)
+	producer.ctx, producer.cancel = context.WithCancel(context.Background())
+
+	for i := 0; i < producerNum; i++ {
+		opts := []kgo.Opt{
+			kgo.SeedBrokers(cfg.BrokerList),
+			kgo.RequiredAcks(kgo.LeaderAck()),
+			kgo.ProducerLinger(time.Millisecond * time.Duration(cfg.FlushFrequency)),
+			kgo.ProducerBatchMaxBytes(int32(cfg.FlushMaxMessages)),
+			kgo.RequestTimeoutOverhead(time.Millisecond * time.Duration(cfg.Timeout)),
+			kgo.RequestRetries(3),
+		}
+
+		client, err := kgo.NewClient(opts...)
+		if err != nil {
+			return nil, err
+		}
+		producer.clients = append(producer.clients, client)
 	}
 
-	producer.producer = p
 	return producer, nil
 }
 
@@ -71,63 +85,48 @@ func (p *Producer) ErrorChannel() <-chan *MessageError {
 }
 
 func (p *Producer) Start() {
-	go p.receiveMessages()
-	go p.receiveDeliveryReports()
+	for _, client := range p.clients {
+		go p.receiveMessages(client)
+	}
 }
 
 func (p *Producer) Stop() {
-	p.stopChannel <- true
-	// Flush any remaining messages
-	remaining := p.producer.Flush(10000)
-	if remaining > 0 {
-		fmt.Printf("Warning: %d messages in queue were not delivered\n", remaining)
+	for i := 0; i < len(p.clients); i++ {
+		p.stopChannel <- true
 	}
-	p.producer.Close()
+	p.cancel()
+	for _, client := range p.clients {
+		client.Flush(p.ctx)
+		client.Close()
+	}
 }
 
-func (p *Producer) receiveMessages() {
+func (p *Producer) receiveMessages(client *kgo.Client) {
 	for {
 		select {
 		case msg := <-p.messageChannel:
-			partition := kafka.PartitionAny
-			if msg.Partition != 0 {
-				partition = msg.Partition
-			}
-			
-			kmsg := &kafka.Message{
-				TopicPartition: kafka.TopicPartition{
-					Topic:     &msg.Topic,
-					Partition: partition,
-				},
-				Key:   msg.Key,
+			record := &kgo.Record{
+				Topic: msg.Topic,
 				Value: msg.Data,
 			}
-			
-			p.producer.ProduceChannel() <- kmsg
+			if msg.Key != nil {
+				record.Key = msg.Key
+			}
+
+			client.Produce(p.ctx, record, func(r *kgo.Record, err error) {
+				if err != nil {
+					p.errorChannel <- &MessageError{
+						Error:     err,
+						Topic:     r.Topic,
+						Timestamp: r.Timestamp,
+						Partition: r.Partition,
+						Offset:    r.Offset,
+					}
+				}
+			})
 		case stop := <-p.stopChannel:
 			if stop {
 				return
-			}
-		}
-	}
-}
-
-func (p *Producer) receiveDeliveryReports() {
-	for e := range p.producer.Events() {
-		switch ev := e.(type) {
-		case *kafka.Message:
-			if ev.TopicPartition.Error != nil {
-				p.errorChannel <- &MessageError{
-					Error:     ev.TopicPartition.Error,
-					Topic:     *ev.TopicPartition.Topic,
-					Timestamp: ev.Timestamp,
-					Partition: ev.TopicPartition.Partition,
-					Offset:    int64(ev.TopicPartition.Offset),
-				}
-			}
-		case kafka.Error:
-			p.errorChannel <- &MessageError{
-				Error: ev,
 			}
 		}
 	}

@@ -2,22 +2,20 @@ package kafka
 
 import (
 	"context"
-	"fmt"
 	"github.com/aminvici/bds/common/log"
-	"github.com/segmentio/kafka-go"
-	"strings"
-	"time"
+	"github.com/twmb/franz-go/pkg/kadm"
+	"github.com/twmb/franz-go/pkg/kgo"
 )
 
 type Consumer struct {
-	reader         *kafka.Reader
+	client         *kgo.Client
+	brokerList     string
 	messageChannel chan *Message
 	errorChannel   chan *MessageError
 	stopChannel    chan bool
 	ctx            context.Context
 	cancel         context.CancelFunc
 	partitionNum   int
-	brokers        []string
 }
 
 type ConsumerConfig struct {
@@ -34,8 +32,7 @@ type ConsumerConfig struct {
 
 func NewConsumer(cfg *ConsumerConfig) (*Consumer, error) {
 	consumer := new(Consumer)
-	consumer.brokers = strings.Split(cfg.BrokerList, ",")
-
+	consumer.brokerList = cfg.BrokerList
 	consumer.messageChannel = make(chan *Message, cfg.BufferSize)
 	consumer.errorChannel = make(chan *MessageError, cfg.BufferSize)
 	consumer.stopChannel = make(chan bool)
@@ -53,47 +50,56 @@ func (c *Consumer) ErrorChannel() <-chan *MessageError {
 }
 
 func (c *Consumer) Start(topic string) error {
-	// Get broker list from context or configuration
-	// We'll need to store it in the struct
-	cfg := c.getReaderConfig(topic)
-	c.reader = kafka.NewReader(cfg)
-
-	// Get partition count for the topic
-	conn, err := kafka.Dial("tcp", cfg.Brokers[0])
-	if err != nil {
-		return fmt.Errorf("failed to dial broker: %v", err)
+	// Get broker list from a temporary client to fetch metadata
+	tempOpts := []kgo.Opt{
+		kgo.SeedBrokers(c.brokerList),
+		kgo.RequestRetries(3),
 	}
-	defer conn.Close()
-
-	partitions, err := conn.ReadPartitions(topic)
+	tempClient, err := kgo.NewClient(tempOpts...)
 	if err != nil {
-		return fmt.Errorf("failed to read partitions: %v", err)
+		return err
 	}
 
-	c.partitionNum = len(partitions)
+	// Get partition count
+	admClient := kadm.NewClient(tempClient)
+	metadata, err := admClient.Metadata(c.ctx)
+	if err != nil {
+		tempClient.Close()
+		return err
+	}
+
+	if topicMeta, ok := metadata.Topics[topic]; ok {
+		c.partitionNum = len(topicMeta.Partitions)
+	}
+	tempClient.Close()
+
 	log.Debug("kafka: topic %s partitions %d", topic, c.partitionNum)
+
+	// Create the actual consumer client
+	opts := []kgo.Opt{
+		kgo.SeedBrokers(c.brokerList),
+		kgo.ConsumeTopics(topic),
+		kgo.ConsumeResetOffset(kgo.NewOffset().AtEnd()),
+		kgo.RequestRetries(3),
+	}
+	client, err := kgo.NewClient(opts...)
+	if err != nil {
+		return err
+	}
+	c.client = client
 
 	go c.receiveMessages()
 	return nil
 }
 
-func (c *Consumer) getReaderConfig(topic string) kafka.ReaderConfig {
-	return kafka.ReaderConfig{
-		Brokers:        c.brokers,
-		Topic:          topic,
-		StartOffset:    kafka.LastOffset,
-		MinBytes:       10e3, // 10KB
-		MaxBytes:       10e6, // 10MB
-		CommitInterval: time.Second,
-	}
-}
-
 func (c *Consumer) Stop() {
 	c.cancel()
-	if c.reader != nil {
-		_ = c.reader.Close()
+	if c.client != nil {
+		c.client.Close()
 	}
-	close(c.stopChannel)
+	for i := 0; i < c.partitionNum; i++ {
+		c.stopChannel <- true
+	}
 }
 
 func (c *Consumer) receiveMessages() {
@@ -101,28 +107,31 @@ func (c *Consumer) receiveMessages() {
 		select {
 		case <-c.ctx.Done():
 			return
+		case <-c.stopChannel:
+			return
 		default:
-			msg, err := c.reader.ReadMessage(c.ctx)
-			if err != nil {
-				if err == context.Canceled {
-					return
+			fetches := c.client.PollFetches(c.ctx)
+			if errs := fetches.Errors(); len(errs) > 0 {
+				for _, err := range errs {
+					log.Debug("kafka: topic %s partition %d receive error %s", err.Topic, err.Partition, err.Err.Error())
+					c.errorChannel <- &MessageError{
+						Error:     err.Err,
+						Topic:     err.Topic,
+						Partition: err.Partition,
+					}
 				}
-				log.Debug("kafka: receive error %v", err)
-				c.errorChannel <- &MessageError{
-					Error: err,
-					Topic: msg.Topic,
-				}
-				continue
 			}
 
-			log.Debug("kafka: topic %s receive data length %d", msg.Topic, len(msg.Value))
-			c.messageChannel <- &Message{
-				Topic:     msg.Topic,
-				Partition: int32(msg.Partition),
-				Offset:    msg.Offset,
-				Key:       msg.Key,
-				Data:      msg.Value,
-			}
+			fetches.EachRecord(func(record *kgo.Record) {
+				log.Debug("kafka: topic %s receive data length %d", record.Topic, len(record.Value))
+				c.messageChannel <- &Message{
+					Topic:     record.Topic,
+					Partition: record.Partition,
+					Offset:    record.Offset,
+					Key:       record.Key,
+					Data:      record.Value,
+				}
+			})
 		}
 	}
 }

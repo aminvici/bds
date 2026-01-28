@@ -1,3 +1,6 @@
 [submodule "vendor/stellar"]
 	path = vendor/stellar
 	url = git@github.com:aminvici/go.git
+[submodule "vendor/java-tron"]
+	path = vendor/java-tron
+	url = git@github.com:aminvici/java-tron.git

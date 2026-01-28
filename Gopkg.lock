@@ -80,6 +80,15 @@
   version = "v1.42.0"
 
 [[projects]]
+  name = "github.com/pierrec/lz4/v4"
+  packages = [
+    ".",
+    "internal/xxh32"
+  ]
+  revision = "cd9d7a4f66405a92f4881933816b828b0f7d5fe2"
+  version = "v4.1.23"
+ 
+[[projects]]
   digest = "1:ec6f9bf5e274c833c911923c9193867f3f18788c461f76f05f62bb1510e0ae65"
   name = "github.com/go-sql-driver/mysql"
   packages = ["."]
@@ -139,17 +148,6 @@
   pruneopts = "UT"
   revision = "bc6a3c0594130b1e34005880bc600b6d3f49fa7f"
   version = "v1.1.1"
-
-[[projects]]
-  digest = "1:259f9b7645983a7a823318d78aa96dec68af8891f706493ac1ec04d819cb977c"
-  name = "github.com/pierrec/lz4"
-  packages = [
-    ".",
-    "internal/xxh32",
-  ]
-  pruneopts = "UT"
-  revision = "d705d4371bfccdf47f10e45584e896026c83616f"
-  version = "v2.2.3"
 
 [[projects]]
   branch = "master"
